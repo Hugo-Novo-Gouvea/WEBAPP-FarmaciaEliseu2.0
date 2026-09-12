@@ -1,0 +1,606 @@
+/==================================================/
+  BACK-END
+/==================================================/
+
+Tecnologia: .NET
+
+Versão instalada no computador (verificado em 2026-08-30):
+- .NET SDK: 10.0.102
+  - Runtimes .NET instalados:
+    - Microsoft.AspNetCore.App 10.0.2
+    - Microsoft.NETCore.App 8.0.21
+    - Microsoft.NETCore.App 10.0.2
+    - Microsoft.WindowsDesktop.App 10.0.2
+
+
+/==================================================/
+  FRONT-END
+/==================================================/
+
+Tecnologia: React
+
+Versão instalada no computador (verificado em 2026-08-30):
+- Node.js: v24.15.0
+
+
+/==================================================/
+  BANCO DE DADOS
+/==================================================/
+
+Tecnologia: PostgreSQL
+
+Versão instalada no computador (verificado em 2026-08-30):
+- PostgreSQL: 18.1
+
+Esquema do banco "FarmaciaEliseu" (verificado em 2026-08-30, apenas leitura):
+
+Tabela: clientes
+  - clientes_id           integer         PK, not null, auto (sequence)
+  - nome                  varchar(200)
+  - endereco              varchar(200)
+  - rg                    varchar(30)
+  - cpf                   varchar(30)
+  - telefone              varchar(50)
+  - celular               varchar(50)
+  - data_nascimento       timestamp(0)
+  - codigo_fichario       integer
+  - data_cadastro         timestamp(0)    default now()
+  - data_ultimo_registro  timestamp(0)    default now()
+  - deletado              boolean         default false
+  Índices: clientes_pkey (clientes_id), idx_clientes_codigo (codigo_fichario)
+
+Tabela: funcionarios
+  - funcionarios_id       integer         PK, not null, auto (sequence)
+  - nome                  varchar(200)
+  - codigo_antigo         varchar(10)
+  - data_cadastro         timestamp(0)    default now()
+  - data_ultimo_registro  timestamp(0)    default now()
+  - deletado              boolean         default false
+  Índices: funcionarios_pkey (funcionarios_id)
+
+Tabela: produtos
+  - produtos_id           integer         PK, not null, auto (sequence)
+  - descricao             varchar(200)
+  - unidade_medida        varchar(200)
+  - preco_compra          numeric(19,4)
+  - preco_venda           numeric(19,4)
+  - localizacao           varchar(200)
+  - laboratorio           varchar(200)
+  - principio             varchar(200)
+  - generico              varchar(3)
+  - codigo_produto        varchar(20)
+  - codigo_barras         varchar(50)
+  - data_cadastro         timestamp(0)    default now()
+  - data_ultimo_registro  timestamp(0)    default now()
+  - deletado              boolean         default false
+  Índices: produtos_pkey (produtos_id), idx_produtos_ativos (deletado=false), idx_produtos_codigo (codigo_produto)
+
+Tabela: movimentos  (provavelmente vendas)
+  - movimentos_id         integer         PK, not null, auto (sequence)
+  - codigo_movimento      integer
+  - clientes_id           integer         (referência lógica a clientes.clientes_id)
+  - clientes_nome         varchar(200)    (desnormalizado)
+  - funcionarios_id       integer         (referência lógica a funcionarios.funcionarios_id)
+  - funcionarios_nome     varchar(200)    (desnormalizado)
+  - valor_total           numeric(19,4)
+  - desconto_total        numeric(19,4)
+  - valor_pago            numeric(19,4)
+  - data_venda            timestamp(0)
+  - data_pagamento        timestamp(0)
+  - data_cadastro         timestamp(0)    default now()
+  - data_ultimo_registro  timestamp(0)    default now()
+  - deletado              boolean         default false
+  Índices: movimentos_pkey (movimentos_id), idx_movimentos_ativos (deletado=false),
+           idx_movimentos_codigo (codigo_movimento), idx_movimentos_nao_pagos_id (data_pagamento IS NULL),
+           idx_movimentos_pendentes_real (data_pagamento IS NULL)
+
+Tabela: itens_por_movimento  (itens de cada venda/movimento)
+  - ipm_id                    integer      PK, not null, auto (sequence)
+  - movimentos_id             integer      (referência lógica a movimentos.movimentos_id)
+  - produtos_id               integer      (referência lógica a produtos.produtos_id)
+  - produtos_descricao        varchar(200) (desnormalizado)
+  - produtos_codigo_produto   varchar(20)  (desnormalizado)
+  - quantidade                integer
+  - preco_unitario_dia_venda  numeric(19,4)
+  - preco_total_dia_venda     numeric(19,4)
+  - preco_unitario_atual      numeric(19,4)
+  - preco_total_atual         numeric(19,4)
+  - data_cadastro             timestamp(0) default now()
+  - deletado                  boolean      default false
+  - data_pagamento_item       timestamp(0)
+  Índices: itens_por_movimento_pkey (ipm_id), idx_ipm_movimento (movimentos_id), idx_ipm_produtos_id_real (produtos_id)
+
+Observações:
+  - Nenhuma constraint de FOREIGN KEY foi encontrada declarada no banco; os relacionamentos entre
+    tabelas (clientes_id, funcionarios_id, movimentos_id, produtos_id) parecem ser mantidos apenas
+    a nível de aplicação, com dados desnormalizados (ex.: nome/descrição) replicados nas tabelas filhas.
+  - Todas as tabelas usam "deletado" (boolean) para soft delete, em vez de exclusão física.
+  - Relação lógica: clientes 1—N movimentos; funcionarios 1—N movimentos; movimentos 1—N itens_por_movimento; produtos 1—N itens_por_movimento.
+
+
+/==================================================/
+  PLANO DE AÇÃO
+/==================================================/
+
+1. Criar um webapp utilizando React para front e .NET para back  [FRONT-END + BACK-END]  -- FEITO (2026-08-30)
+2. Tela inicial sem nada  [FRONT-END]  -- FEITO (2026-08-30)
+3. Menu lateral com o nome Farmacia Farmacia  [FRONT-END]  -- FEITO (2026-08-30), texto atualizado para "Farmácia do Eliseu" (2026-09-07)
+4. CRUD de clientes, Funcionarios e Produtos (Remédios e produtos farmaceuticos)  [FRONT-END + BACK-END + BANCO DE DADOS]  -- FEITO (2026-08-30)
+
+Detalhes da implementação (2026-08-30):
+  - backend/FarmaciaEliseu.Api: ASP.NET Core 10 Web API, EF Core (Npgsql) mapeando
+    manualmente (Fluent API) as tabelas clientes/funcionarios/produtos já existentes,
+    sem migrations (nenhuma alteração de schema). Connection string guardada via
+    `dotnet user-secrets` (fora do repositório, nunca commitada).
+  - frontend/: React + TypeScript + Vite + MUI + react-router-dom. Sidebar fixa
+    "Farmácia do Eliseu" com Início (vazio) e as 3 telas de CRUD (tabela com busca,
+    paginação e dialog de criar/editar). Tema visual: vermelho escurecido/vivo em
+    degradê + branco suave (frontend/src/theme.ts).
+  - Delete no CRUD é sempre soft delete (UPDATE deletado = true), nunca DELETE FROM.
+  - Como rodar: `cd backend/FarmaciaEliseu.Api && dotnet run` (API em
+    http://localhost:5080) e `cd frontend && npm run dev` (app em
+    http://localhost:5173, com proxy /api -> backend).
+
+5. Grupo "Vendas" no menu lateral: Vender, Movimentação, Contas a Receber  -- FEITO (2026-09-07)
+   - Vender: PDV completo. Forma de pagamento (Dinheiro/Marcar), cliente (cadastrado
+     via busca ou "Avulso" = clientes_id 1 "CLIENTE NAO INFORMADO"), funcionário,
+     e produtos: campo único que aceita código de barras (Enter = adiciona direto,
+     usa GET /api/produtos/buscar?codigoBarras=) ou nome (Enter = abre modal de busca,
+     usa GET /api/produtos/buscar?nome=, produtos tem ~59 mil linhas então a busca é
+     sempre no backend), além de "item avulso" (produtos_id 1 "PRODUTO GENERICO",
+     com descrição/valor livres). Finalizar Venda cria o movimento + itens via
+     POST /api/vendas (transação única). Como a tabela movimentos não tem coluna de
+     forma de pagamento, isso é representado com as colunas existentes: "Dinheiro" ->
+     data_pagamento = agora / valor_pago = valor_total; "Marcar" -> data_pagamento =
+     NULL / valor_pago = 0 (cai direto no Contas a Receber já existente).
+   - Movimentação: lista os 48 mil+ movimentos (paginação/busca no backend, não no
+     front, por causa do volume) e permite abrir cada um para ver os itens vendidos.
+   - Contas a Receber: lista movimentos com data_pagamento IS NULL (fiado em aberto),
+     permite ver os itens e marcar como pago (POST /api/movimentos/{id}/marcar-pago,
+     que só atualiza data_pagamento/valor_pago do próprio movimento).
+
+   Achado importante sobre pagamento (2026-09-07): a coluna data_pagamento não usa só
+   NULL para "não pago" — 1.546 movimentos têm a data legada "1901-01-01" como
+   placeholder de pagamento não realizado (todos com valor_pago = 0). Por pedido
+   explícito, isso foi tratado como uma questão separada por enquanto: o Contas a
+   Receber e o "marcar como pago" atual consideram em aberto **apenas** data_pagamento
+   IS NULL (1.558 movimentos / ~R$ 192.919). Se um dia decidirem tratar a data
+   sentinela de 1901 também como pendente, o total sobe para 3.104 movimentos /
+   ~R$ 379.438 — vale revisitar isso.
+
+Pendência conhecida (2026-09-07): a tela de CRUD de Produtos (frontend/src/pages/ProdutosPage.tsx)
+ainda busca TODOS os ~59 mil produtos de uma vez (GET /api/produtos sem paginação),
+igual ao que a Movimentação fazia antes de eu corrigir. Vale aplicar a mesma
+paginação/busca no backend usada em Movimentação/Contas a Receber.
+
+6. Impressão do recibo (impressora térmica, uma por computador)  -- FEITO (2026-09-07)
+   Decisão: sem serviço externo pago (descartamos QZ Tray — o núcleo é grátis, mas
+   impressão 100% silenciosa exige certificado pago da QZ, US$ 749/ano). Em vez disso:
+   - frontend/src/printing/Recibo.tsx: layout do recibo (80mm), renderizado fora da
+     tela (frontend/src/index.css, regra "#print-recibo") e só revelado durante a
+     impressão via @media print (o resto da página fica visibility:hidden).
+   - frontend/src/printing/useImpressaoRecibo.ts: dispara window.print() assim que a
+     venda é finalizada (VenderPage.tsx chama `imprimir(resultado)` no sucesso).
+   - Isso sozinho ainda abre o diálogo de impressão do navegador. Para impressão
+     automática sem diálogo nenhum, cada computador precisa rodar o Chrome/Edge com
+     a flag --kiosk-printing (recurso nativo do navegador, grátis, sem dependência
+     externa) e ter a impressora térmica configurada como impressora padrão do
+     Windows. Isso é configuração local por máquina, não código:
+       1. Criar um atalho do Chrome com o argumento: --kiosk-printing
+          (ex.: "C:\...\chrome.exe" --kiosk-printing http://<ip-do-servidor>:5173)
+       2. Definir a impressora térmica como padrão no Windows daquela estação.
+       3. Abrir o sistema sempre por esse atalho (não pelo ícone normal do Chrome).
+   - Validado via emulação de mídia de impressão do navegador (confirma que o CSS
+     isola e mostra só o recibo); a impressão física em papel térmico de verdade
+     precisa ser conferida por vocês em uma estação real, já que não há impressora
+     térmica disponível neste ambiente de desenvolvimento.
+
+   Atualização (2026-09-11): decisão mudou para gerar o cupom em ESC/POS (bytes
+   crus), portando a lógica do CupomService do sistema antigo. Criado
+   backend/FarmaciaEliseu.Api/Services/CupomService.cs (registrado no DI em
+   Program.cs), com o método GerarBase64Venda(MovimentoDetalheDto, codigoFichario)
+   — mesmo layout de 40 colunas, negrito via ESC/POS, corte de guilhotina, e a
+   mesma regra de negócio do sistema antigo: se a venda é fiada (DataPagamento
+   nulo), os valores dos itens/subtotal/total ficam escondidos e aparece "APRAZO"
+   no lugar. Testado isoladamente (venda paga, venda fiada, venda sem itens) —
+   gera os bytes certos nos 3 casos, sem lançar exceção.
+   AINDA NÃO ESTÁ LIGADO A NENHUM ENDPOINT NEM À TELA DE VENDER — é só o gerador
+   do modelo, como pedido. Falta definir os "pontos de impressão" (quando/onde
+   chamar isso e como os bytes chegam de fato até a impressora física de cada
+   estação — isso é outra decisão em aberto, diferente da abordagem
+   window.print()/CSS que também já existe em frontend/src/printing/).
+
+   Atualização (2026-09-11): pontos de impressão definidos e implementados.
+   - print-agent/FarmaciaEliseu.PrintAgent: projeto novo (ASP.NET Core mínimo),
+     roda em CADA computador (Windows), escuta em http://localhost:9123.
+     Recebe o Base64 do navegador via POST /imprimir e manda os bytes crus
+     direto pra impressora padrão do Windows daquele PC via RawPrinterHelper.cs
+     (P/Invoke em winspool.drv — OpenPrinter/StartDocPrinter/WritePrinter,
+     datatype "RAW"). GET /status devolve a impressora padrão detectada.
+     Sem isso o navegador não tem como mandar bytes crus pra impressora.
+     Instruções de instalação/execução em print-agent/README.md.
+   - Removida a abordagem antiga window.print()/CSS (frontend/src/printing/
+     Recibo.tsx, useImpressaoRecibo.ts, e a regra @media print do index.css) —
+     substituída pela geração ESC/POS + agente local.
+   - frontend/src/printing/agente.ts: chama o agente local (fetch para
+     localhost:9123/imprimir). frontend/src/printing/perguntarEImprimir.ts:
+     window.confirm("Deseja imprimir o cupom?") → se sim, busca o cupom
+     (GET /api/movimentos/{id}/cupom) e manda pro agente → pergunta de novo
+     ("...novamente?") → repete até a pessoa clicar em não.
+   - 3 pontos de impressão ligados a essa mesma função:
+     1. Botão "Imprimir" sempre visível no dialog de detalhes de um movimento
+        (components/MovimentoDetalheDialog.tsx) — usado em Movimentação e
+        também aparece em Contas a Receber (mesmo dialog compartilhado).
+     2. VenderPage.tsx: ao finalizar uma venda com sucesso, dispara o loop
+        de pergunta/impressão automaticamente.
+     3. ContasAReceberPage.tsx: ao marcar um movimento como pago, dispara o
+        mesmo loop automaticamente.
+   - Validado o pipeline completo (HTTP, CORS entre origem do front e o agente,
+     chamada Win32 real, loop pergunta→imprime→pergunta de novo→para no "não")
+     usando o simulador "Microsoft Print to PDF" desta máquina (detectado
+     corretamente como impressora padrão). AINDA FALTA confirmar em uma
+     impressora térmica física de verdade, numa estação real — não há uma
+     disponível neste ambiente de desenvolvimento. Todos os movimentos/PDFs
+     de teste gerados durante essa validação foram removidos/revertidos.
+
+/==================================================/
+  RECAP GERAL E VALIDAÇÃO (2026-09-11)
+/==================================================/
+
+Correção crítica encontrada e aplicada nesta revisão: backend e frontend só
+aceitavam conexão de "localhost" (o próprio servidor), e o CORS só liberava
+"http://localhost:5173". Ou seja, ANTES dessa correção, nenhum outro PC da
+rede conseguiria acessar o sistema — o requisito de "vários computadores"
+não funcionaria. Corrigido:
+  - backend/FarmaciaEliseu.Api/Properties/launchSettings.json: applicationUrl
+    de "http://localhost:5080" para "http://0.0.0.0:5080" (aceita qualquer
+    interface de rede, não só loopback).
+  - backend/FarmaciaEliseu.Api/Program.cs: CORS de WithOrigins("localhost:5173")
+    para AllowAnyOrigin() (uso interno de rede local, não exposto à internet).
+  - frontend/vite.config.ts: adicionado "host: true" no server (aceita
+    conexão de outros PCs, não só do próprio servidor).
+  Validado acessando pelo IP da máquina (simulando outro PC) — funcionou.
+
+Pendências / riscos conhecidos, pensando no porte do negócio (comércio
+pequeno, cidade de ~20 mil habitantes, sem equipe de TI própria):
+
+  ALTA prioridade:
+  - Sem backup do banco Postgres. Se o disco da máquina que hospeda o banco
+    falhar, os dados (vendas, clientes, fiado) se perdem. Precisa de uma
+    rotina de backup (mesmo que simples, tipo pg_dump agendado).
+  - O sistema todo depende de UMA máquina ficar ligada (a que roda o backend
+    + Postgres). Se essa máquina travar/desligar, nenhum PC consegue vender.
+    Vale decidir qual computador vai ser "o servidor" e deixá-lo sempre ligado.
+  - Backend (dotnet run) e frontend (npm run dev) ainda estão rodando em modo
+    de desenvolvimento, não como um serviço de produção real (não reinicia
+    solozinho se cair, não inicia com o Windows). Para uso diário de verdade,
+    isso precisa rodar de um jeito mais robusto (serviço do Windows, ou pelo
+    menos iniciar automaticamente e reiniciar se travar).
+
+  MÉDIA prioridade:
+  - Tela de Produtos ainda busca as ~59 mil linhas de uma vez (sem paginação
+    no backend, diferente de Movimentação/Contas a Receber que já corrigi).
+    Testado agora: ~1,8s para carregar nesta máquina (rápida, rede local sem
+    latência) — num PC mais antigo ou rede mais lenta pode demorar bem mais.
+  - Não existe forma de cancelar/corrigir uma venda já finalizada. Se o
+    vendedor errar um item ou a forma de pagamento, hoje não tem como
+    desfazer pela tela.
+  - Sem login/usuário e senha: qualquer pessoa no computador pode escolher
+    "ser" qualquer funcionário na lista, sem senha. Não há como saber de
+    verdade quem realizou cada venda. Para um comércio pequeno e de confiança
+    isso pode ser aceitável, mas é uma decisão consciente a se tomar.
+
+  BAIXA prioridade / FYI:
+  - A tabela produtos não tem coluna de estoque/quantidade — isso já vinha
+    assim do banco antigo, não fui eu que tirei. Ou seja, o sistema não
+    controla quanto tem de cada produto; vender não baixa estoque nenhum,
+    porque não existe estoque cadastrado.
+  - Agente de impressão (print-agent) funciona tecnicamente (testado com o
+    simulador "Microsoft Print to PDF"), mas ainda não foi testado em uma
+    impressora térmica física de verdade.
+  - Sem testes automatizados (unitários/integração) no projeto.
+
+Validação feita nesta revisão: os 3 projetos (backend, frontend, print-agent)
+compilam sem erro; as 7 telas (Início, Clientes, Funcionários, Produtos,
+Vender, Movimentação, Contas a Receber) carregam sem erro de console; acesso
+via IP da rede local funciona depois da correção. Nenhum dado real foi
+alterado ou excluído nesta verificação. Nessa checagem também achei 2
+movimentos de teste meus (48052/48053) que tinham ficado pra trás de uma
+verificação anterior — apaguei (soft-delete) os dois.
+
+/==================================================/
+  TELA INICIAL (DASHBOARD)
+/==================================================/
+
+FEITO (2026-09-11): a tela Início, que antes era vazia de propósito, agora
+mostra um resumo simples:
+  - Card "Vendas hoje": total em R$ e quantidade de vendas do dia.
+  - Card "Fiado em aberto": total em R$ e quantidade de contas pendentes
+    (mesma regra do Contas a Receber — data_pagamento IS NULL).
+  - Botão "Nova Venda" em destaque, atalho direto pra tela Vender.
+  - Tabela "Últimas vendas": as 5 vendas mais recentes (cliente, funcionário,
+    data, valor, status pago/pendente).
+Backend: novo GET /api/dashboard/resumo (DashboardController), somente
+leitura, soma os movimentos de hoje e os pendentes direto no banco (não traz
+tudo pro front). Frontend: frontend/src/pages/Home.tsx.
+
+/==================================================/
+  4ª TELA EM VENDAS: COBRANÇA
+/==================================================/
+
+FEITO (2026-09-11): novo item "Cobrança" no grupo Vendas do menu lateral.
+A pessoa informa um número de dias (ex.: 60) e a tela mostra as contas do
+Contas a Receber (data_pagamento IS NULL) que estão em aberto há mais tempo
+que isso, ordenadas das mais antigas pra mais novas (prioriza quem deve há
+mais tempo). Mostra uma coluna "Dias em Aberto" calculada a partir da data da
+venda, e reaproveita as mesmas ações do Contas a Receber (ver itens, marcar
+como pago com o mesmo loop de impressão).
+Backend: GET /api/movimentos/cobranca?dias=N (MovimentosController), mesma
+paginação/busca dos outros endpoints de movimentos, mas com data_venda <=
+hoje - N dias.
+Frontend: frontend/src/pages/CobrancaPage.tsx.
+Testado com valores diferentes de dias (0, 60, 120, 200, 250, 300) — o filtro
+funciona corretamente; nos dados reais de hoje, todas as 1.558 contas em
+aberto têm entre ~200 e ~280 dias (não sobrou nenhuma "recente"), por isso
+60 e 120 dão o mesmo resultado — não é bug, é a distribuição real da dívida
+em aberto no banco.
+
+/==================================================/
+  QUITAÇÃO POR ITEM ("ABATER ITENS") NO CONTAS A RECEBER
+/==================================================/
+
+FEITO (2026-09-11): nova aba "Abater Itens" dentro do Contas a Receber (ao
+lado da aba clássica "Por Venda"). Em vez de quitar a venda inteira, o
+usuário marca itens específicos (de uma ou mais vendas do MESMO cliente) que
+o cliente decidiu pagar:
+  - Botão "Abater": quita os itens selecionados como totalmente pagos (usa o
+    próprio total dos itens como valor pago).
+  - Botão "Resto de Conta": abre um diálogo perguntando "Quanto foi pago?" e
+    o funcionário responsável. Se o valor pago for menor que o total
+    selecionado, cria UM novo movimento (pendente) com um único item
+    "RESTO DE CONTA" no valor da diferença — esse novo movimento passa a
+    aparecer normalmente em Movimentação/Contas a Receber/Cobrança dali pra
+    frente.
+  - Quando TODOS os itens (não excluídos) de uma venda ficam quitados, a
+    venda em si também é marcada como paga automaticamente (mantém o Contas
+    a Receber "Por Venda" e este aqui consistentes entre si).
+  - Só permite selecionar itens do mesmo cliente (trava a seleção pelo
+    cliente do primeiro item marcado).
+
+Descoberta interessante: a coluna itens_por_movimento.data_pagamento_item já
+existia no banco antigo exatamente para isso — e ao consultar os dados reais
+encontrei itens "RESTO DE CONTA" já lançados pelo sistema antigo (ex.: ipm_id
+98529), confirmando que essa era mesmo a lógica usada antes.
+
+Backend: novo ItensReceberController — GET /api/itensreceber (lista paginada
+de itens ainda não quitados, cruzando itens_por_movimento + movimentos) e
+POST /api/itensreceber/quitar (transação única: marca os itens, cria o
+"resto de conta" se houver, e fecha a venda se for o caso).
+Frontend: frontend/src/components/AbaterItensSection.tsx, dentro de
+frontend/src/pages/ContasAReceberPage.tsx (abas).
+
+Testado com dados reais (2 cenários: quitação total de 1 item, e quitação
+parcial de 2 itens de uma mesma venda gerando "resto de conta") — os dois
+funcionaram exatamente como esperado (auto-fechamento da venda quando
+aplicável, novo movimento criado corretamente para o resto). Tudo revertido
+ao estado original depois. Durante essa validação, um script de teste meu
+com seletor ambíguo acabou quitando um item errado (de outro cliente) sem eu
+perceber na hora — fiz uma varredura completa em todas as tabelas por
+qualquer alteração "de hoje" ainda ativa no banco para confirmar que nada
+ficou para trás; o problema era só do meu script de teste, não do sistema.
+
+/==================================================/
+  ANÁLISE DE SEGURANÇA, CONCORRÊNCIA E TRATAMENTO DE ERRO (2026-09-11)
+/==================================================/
+
+Revisão pedida cobrindo: segurança, processamento, erros possíveis,
+redundâncias, paginação, concorrência (dois usuários na mesma operação) e
+mensagens de erro na tela. Resumo — o que foi CORRIGIDO nesta revisão e o
+que ficou como RECOMENDAÇÃO (não implementado ainda):
+
+CORRIGIDO:
+  1. Mensagens de erro genéricas em toda a aplicação. Antes, praticamente
+     todo catch mostrava um texto fixo tipo "Não foi possível salvar o
+     registro", mesmo quando o backend já respondia com o motivo exato
+     (ex.: "Funcionário não encontrado", "Os itens selecionados pertencem a
+     clientes diferentes"). Criado frontend/src/utils/errors.ts
+     (getErrorMessage) e aplicado em todas as telas/hooks que chamam a API
+     — agora a mensagem real do servidor aparece na tela sempre que ela
+     existir, com um texto genérico só como último recurso (e uma mensagem
+     própria para "sem conexão com o servidor").
+  2. Bug real encontrado: frontend/src/pages/Home.tsx não tratava erro
+     nenhum na chamada do dashboard — se falhasse, ficava "Carregando..."
+     para sempre, sem avisar nada. Corrigido.
+  3. Impressão: frontend/src/printing/agente.ts agora repassa o motivo real
+     de falha do agente local (ex. impressora não encontrada) em vez de um
+     "Falha ao imprimir" genérico; diferencia também "agente não está
+     rodando" (erro de conexão) de "agente respondeu com erro".
+  4. CONCORRÊNCIA (dois usuários mesma operação ao mesmo tempo) — os 2
+     pontos que envolvem dinheiro e SÓ deveriam acontecer uma vez:
+     - POST /api/movimentos/{id}/marcar-pago
+     - POST /api/itensreceber/quitar
+     Antes: liam o registro, conferiam "ainda não pago?" em código C#, e só
+     depois gravavam — clássica corrida (TOCTOU): se duas pessoas clicassem
+     ao mesmo tempo (ex.: duas atendentes, dois computadores, no mesmo
+     cliente), as duas passariam pela checagem e as duas gravariam, podendo
+     no caso do "Abater Itens" até gerar DOIS lançamentos de "Resto de
+     Conta" pro mesmo cliente.
+     Corrigido: a checagem "só se ainda não foi feito" agora é uma única
+     operação atômica no banco (EF Core ExecuteUpdateAsync com WHERE
+     data_pagamento[_item] IS NULL, dentro de transação). Quem chega
+     primeiro grava; quem chega depois recebe HTTP 409 Conflict com uma
+     mensagem clara em vez de duplicar o lançamento.
+     Testado de propósito disparando 2 requisições literalmente ao mesmo
+     tempo (curl em paralelo) contra o mesmo movimento e contra o mesmo
+     item — nos dois casos, uma teve sucesso (200) e a outra recebeu 409
+     com a mensagem certa. Revertido depois do teste.
+
+RECOMENDAÇÕES (ainda não implementadas — prioridade pensando no porte do
+negócio):
+
+  ALTA:
+  - Paginação: Produtos (~59 mil linhas) e Clientes (~1.513 linhas,
+    incluindo o Autocomplete de cliente na tela Vender) ainda buscam tudo
+    de uma vez do backend, ao contrário de Movimentação/Contas a
+    Receber/Cobrança/Abater Itens que já são paginados no servidor. Produtos
+    já tinha sido identificado antes; Clientes é um achado novo desta
+    revisão — como a tela Vender usa a lista completa de clientes toda vez
+    que abre, isso deixa o PDV mais lento do que precisa em máquinas/redes
+    mais fracas.
+  - Segurança: sem autenticação nenhuma (já registrado antes) — combinado
+    com CORS liberado (AllowAnyOrigin) e o backend agora aceitando conexão
+    de qualquer IP da rede (mudança feita para permitir vários
+    computadores), significa que qualquer pessoa com acesso à rede local
+    consegue ver dados de clientes (CPF, endereço, telefone) e realizar
+    qualquer ação, sem nenhum registro confiável de quem fez o quê — o
+    campo "funcionário" é escolhido livremente, sem senha, então pode ser
+    falsificado por qualquer pessoa com acesso ao navegador.
+
+  MÉDIA:
+  - Sem trava contra criar cliente/produto com nome vazio ("") — a
+    validação automática do backend só bloqueia campo ausente/nulo, não
+    campo vazio.
+  - Sem forma de cancelar uma venda já finalizada pela tela (mencionado
+    antes também).
+  - print-agent aceita pedido de impressão de qualquer aba/site aberto no
+    mesmo computador (AllowAnyOrigin + escuta em localhost) — um site
+    malicioso aberto no mesmo PC poderia em teoria mandar imprimir algo
+    (baixo risco, mas existe).
+
+  BAIXA / FYI:
+  - Dados desnormalizados (nome do cliente/funcionário copiado nas vendas,
+    descrição do produto copiada nos itens) são uma decisão do banco
+    original, não um bug — preserva o "retrato" da venda no momento em que
+    aconteceu, mesmo que o cadastro mude depois. Só vale lembrar que, se
+    editar o nome de um cliente, vendas antigas continuam mostrando o nome
+    antigo (é o esperado, não um erro).
+  - Alguma duplicação de código entre as telas de listagem (Movimentação,
+    Contas a Receber, Cobrança compartilham uma estrutura bem parecida de
+    busca/paginação/tabela) — funciona bem, mas poderia virar um componente
+    único no futuro se ficar difícil de manter.
+  - Sem testes automatizados no projeto (mencionado antes também).
+  - Sem HTTPS — tráfego em texto puro dentro da rede local. Risco baixo se
+    a rede for só dos computadores da farmácia, mas relevante se o Wi-Fi
+    for compartilhado com clientes ou não tiver senha.
+
+Validado nesta revisão: os 3 projetos compilam sem erro; as 7+1 telas
+carregam sem erro de console; os dois testes de corrida (marcar-pago e
+quitar) foram executados de propósito e confirmaram o comportamento
+esperado; nenhum dado real ficou alterado.
+
+/==================================================/
+  DESCONTO, EDITAR ITEM, CANCELAR VENDA, NOVO CLIENTE NO PDV,
+  FECHAMENTO DE CAIXA (2026-09-11)
+/==================================================/
+
+FEITO — 5 pedidos desta rodada (estoque e nota fiscal ficaram de fora, por
+decisão explícita: o programa não é responsável por NF, e não precisa
+controlar estoque).
+
+1-2. Desconto por item (% ou R$ fixo) + editar preço do item no carrinho.
+   Tela Vender: cada linha do carrinho agora tem um botão "editar" (lápis)
+   que abre um diálogo com Quantidade, Preço Unitário (editável livremente)
+   e Desconto (Nenhum / Percentual / Fixo). O carrinho mostra a coluna
+   "Desconto" e o total já líquido; embaixo aparece "Desconto total" quando
+   houver. frontend/src/utils/carrinho.ts calcula bruto/desconto/total por
+   item. Ao finalizar, o preço unitário líquido (já com desconto) é o que
+   vai pro backend, e a soma dos descontos vai no novo campo
+   VendaInputDto.DescontoTotal → grava em movimentos.desconto_total (igual
+   ao que o sistema antigo já fazia, o cupom já sabia mostrar
+   SUBTOTAL/DESCONTO quando esse campo é maior que zero).
+
+3. Cancelar venda. Botão "Cancelar Venda" (vermelho) no dialog de detalhes
+   de um movimento — disponível em Movimentação, Contas a Receber e
+   Cobrança (mesmo dialog compartilhado). Confirma antes, e faz soft delete
+   do movimento E de todos os itens dele (nunca DELETE FROM) via novo
+   POST /api/movimentos/{id}/cancelar. A venda cancelada some de todas as
+   telas automaticamente (Movimentação, Contas a Receber, Cobrança,
+   Dashboard, Fechamento de Caixa) porque todas já filtram deletado=false.
+
+4. Cadastrar cliente novo direto da tela Vender. Botão "+" do lado do
+   campo de cliente abre um formulário rápido (nome, celular, telefone,
+   CPF, endereço) — ao salvar, o cliente já fica selecionado na venda, sem
+   sair da tela. components/NovoClienteDialog.tsx, reaproveita
+   clientesApi.create já existente.
+
+5. Fechamento de Caixa — "dashboard novo". Nova tela no grupo Vendas
+   (GET /api/dashboard/fechamento?data=AAAA-MM-DD, default hoje):
+   - Vendas no dia (qtd + total)
+   - Recebido em dinheiro no dia (vendas pagas na hora)
+   - Ficou pendente do dia (fiado gerado no dia)
+   - Recebido de dívidas antigas no dia (pagamentos de hoje referentes a
+     vendas de dias anteriores — cobrança)
+   - Tabela por funcionário (qtd de vendas e total)
+   Um seletor de data permite ver o fechamento de qualquer dia, não só hoje.
+   Extraído components/StatCard.tsx (usado também pela Início) pra não
+   duplicar os cards.
+   Bug encontrado e corrigido durante o teste: a consulta agrupada "por
+   funcionário" não era traduzível pelo EF Core direto (GroupBy + Select
+   com múltiplos agregados num record) — corrigido projetando num tipo
+   anônimo primeiro e só depois montando o DTO em memória.
+
+Validação: testei o fluxo completo de ponta a ponta com dados reais —
+cliente novo cadastrado direto do PDV, item com preço editado (R$100) e
+desconto fixo (R$15), venda finalizada com sucesso (total R$85, desconto
+R$15 gravados corretamente no movimento), depois cancelei essa mesma venda
+de teste pela tela de Movimentação (sumiu na hora de todas as listas) e
+apaguei (soft-delete via API) o cliente de teste. Fechamento de Caixa
+testado com uma data histórica real (07/01/2026: 98 vendas, R$13.048,79,
+break down por funcionário batendo exatamente com o total). Varredura final
+em todas as tabelas confirmou que nenhum dado de teste ficou para trás.
+
+/==================================================/
+  OPERACIONAL: SERVIÇOS DO WINDOWS + BACKUP AUTOMÁTICO (2026-09-11)
+/==================================================/
+
+FEITO — os 3 itens da lista "operacional" de antes, prontos pra usar.
+Agora falta só rodar os scripts (publicar + criar os serviços), não
+precisa mexer em mais nada no código.
+
+1. Backend e frontend juntos, num serviço só. O backend (ASP.NET Core)
+   agora também serve a tela React já buildada (arquivos estáticos +
+   fallback pra index.html, pra rotas do React Router funcionarem).
+   Ou seja, não existe mais "serviço do frontend" separado — um único
+   processo na porta 5080 atende a tela inteira e a API. No
+   desenvolvimento local não muda nada (continua "npm run dev" +
+   "dotnet run" separados, como sempre).
+   - backend/.../Program.cs: UseWindowsService() (deixa rodar como
+     Serviço do Windows) + UseStaticFiles()/MapFallbackToFile("index.html").
+   - backend/.../FarmaciaEliseu.Api.csproj: novo target que roda
+     "npm run build" do front e copia pra dentro da pasta publicada
+     automaticamente durante "dotnet publish".
+   - Achado durante o teste: copiar os arquivos pra wwwroot do projeto-fonte
+     ANTES de publicar não funciona (o ASP.NET Core decide o que entra no
+     publish antes disso rodar) — corrigido copiando DEPOIS do publish,
+     direto pra pasta de saída.
+   - appsettings.Production.json.example (comitado, sem senha) — copiar
+     pra appsettings.Production.json (gitignorado) e preencher a senha real
+     na máquina do servidor. Sem isso, o serviço publicado não acha a
+     connection string (dotnet user-secrets só funciona em desenvolvimento).
+
+2. print-agent também pronto pra virar Serviço do Windows (mesmo
+   UseWindowsService() no Program.cs dele).
+
+3. Backup automático do banco: deploy/backup-database.ps1 (pg_dump em
+   formato custom, apaga backups com mais de 30 dias) +
+   deploy/configurar-pgpass.ps1 (guarda a senha localmente, uma vez, pro
+   backup rodar sozinho de madrugada sem travar pedindo senha) +
+   deploy/install-backup-task.ps1 (agenda no Agendador de Tarefas do
+   Windows, roda como SYSTEM, todo dia às 23:30 por padrão).
+
+Scripts novos em deploy/ (todos testados): publish.ps1,
+install-backend-service.ps1, install-print-agent-service.ps1,
+uninstall-services.ps1, configurar-pgpass.ps1, backup-database.ps1,
+install-backup-task.ps1. Passo a passo completo em deploy/README.md.
+
+Validação: testei o "dotnet publish" de verdade e RODEI o executável
+publicado (fora do modo desenvolvimento) — confirmei que a tela carrega,
+navegação entre rotas funciona (SPA fallback) e a API responde, tudo na
+mesma porta 5080, exatamente como um Serviço do Windows executaria. Testei
+o backup-database.ps1 de verdade (gerou um .backup de 5,46 MB, validado com
+pg_restore --list mostrando as tabelas certas) — apagado depois do teste.
+NÃO instalei os Serviços do Windows nem a Tarefa Agendada de verdade nesta
+máquina (são mudanças persistentes no sistema operacional, e esta é a
+máquina de desenvolvimento, não o servidor real da farmácia) — só validei
+a sintaxe de todos os scripts .ps1 (sem erro) e testei manualmente a lógica
+de cada um onde era seguro fazer isso sem alterar o Windows desta máquina.

@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>11e26f3f-2c0f-4d28-808b-fc50ccf97add</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+  </ItemGroup>
+
+  <!-- No "dotnet publish", builda o frontend (npm run build) e copia o
+       resultado DIRETO para a pasta de publicação (não para wwwroot do
+       projeto-fonte) — o mecanismo de "static web assets" do ASP.NET Core
+       decide o que vai pro publish durante o Build, que roda antes deste
+       alvo, então copiar em wwwroot do projeto não seria incluído a tempo.
+       Copiando depois de "Publish", direto em $(PublishDir)wwwroot,
+       funciona independente disso. Não roda no "dotnet build" comum nem no
+       "dotnet run" de desenvolvimento (que continua usando "npm run dev"
+       separado). -->
+  <Target Name="BuildFrontend" AfterTargets="Publish">
+    <Exec Command="npm run build" WorkingDirectory="$(ProjectDir)..\..\frontend" />
+    <ItemGroup>
+      <FrontendDist Include="$(ProjectDir)..\..\frontend\dist\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FrontendDist)" DestinationFolder="$(PublishDir)wwwroot\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

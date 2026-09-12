@@ -1,0 +1,5 @@
+{
+  "ConnectionStrings": {
+    "FarmaciaEliseu": "Host=localhost;Port=5432;Database=FarmaciaEliseu;Username=postgres;Password=COLOQUE_A_SENHA_AQUI"
+  }
+}

@@ -1,0 +1,228 @@
+GUIA DE INSTALAÇÃO — FARMÁCIA DO ELISEU
+=========================================
+(Como colocar o sistema pra rodar sozinho, todo dia, sem precisar abrir
+terminal nenhum depois de pronto.)
+
+Este guia é auto-suficiente — não precisa ler mais nada além dele pra
+instalar do zero. Os comandos são todos PowerShell do Windows.
+
+
+0. ANTES DE COMEÇAR: O QUE PRECISA ESTAR INSTALADO
+----------------------------------------------------
+
+No SERVIDOR (a máquina que vai ficar com o banco + o sistema ligado):
+  - PostgreSQL (versão 18 ou mais nova) — com o banco "FarmaciaEliseu" já
+    restaurado/existente.
+  - .NET SDK 10 (https://dotnet.microsoft.com/download) — precisa do SDK
+    completo (não só o runtime), porque é ele quem builda o sistema.
+  - Node.js (versão 20 ou mais nova) — necessário só na hora de publicar,
+    porque builda a tela (React). Depois de publicado, não precisa mais do
+    Node rodando.
+  - A pasta do projeto (WEBAPP-FarmaciaEliseu2.0) copiada nessa máquina, ou
+    clonada via Git se houver um repositório remoto configurado.
+
+Em CADA COMPUTADOR com impressora térmica (pode ser o mesmo servidor, se
+ele também for vender):
+  - .NET SDK 10 (só se for publicar ali também) OU só copiar a pasta já
+    publicada de outra máquina (nesse caso não precisa instalar nada além
+    do driver da impressora).
+  - A impressora térmica instalada com o driver do Windows dela.
+
+Todos os comandos de instalação de serviço precisam ser rodados como
+ADMINISTRADOR (botão direito no PowerShell → "Executar como
+administrador").
+
+
+1. VISÃO GERAL — QUEM FAZ O QUÊ
+----------------------------------------------------
+
+- O SERVIDOR roda: o banco de dados (PostgreSQL) + o backend (que também
+  serve a tela do sistema). É UM SERVIÇO SÓ ("FarmaciaEliseuBackend"),
+  numa porta só (5080). Todo mundo na rede acessa o sistema apontando o
+  navegador pro IP desse servidor.
+
+- CADA ESTAÇÃO com impressora térmica (incluindo o servidor, se ele também
+  vender) roda o "agente de impressão" ("FarmaciaEliseuPrintAgent") — um
+  serviço pequeno que fica esperando o navegador mandar cupons pra
+  imprimir naquela máquina especificamente.
+
+Nenhum computador (exceto o servidor) precisa ter o PostgreSQL, o .NET ou
+o Node instalados pra USAR o sistema — só precisa de um navegador (Chrome,
+Edge, etc.) e, se for vender, o agente de impressão.
+
+
+2. PASSO A PASSO NO SERVIDOR
+----------------------------------------------------
+
+Abra o PowerShell (não precisa ser administrador ainda) na pasta raiz do
+projeto (WEBAPP-FarmaciaEliseu2.0) e rode:
+
+  deploy\publish.ps1
+
+Isso builda o backend E a tela juntos (o backend publicado já serve a tela
+sozinho) e publica tudo em C:\FarmaciaEliseu\. Demora um pouco na primeira
+vez (baixa pacotes). Também publica o agente de impressão, pro caso desse
+servidor também vender.
+
+--- Configurar a senha do banco (só na primeira vez) ---
+
+  copy backend\FarmaciaEliseu.Api\appsettings.Production.json.example C:\FarmaciaEliseu\backend\appsettings.Production.json
+  notepad C:\FarmaciaEliseu\backend\appsettings.Production.json
+
+No Bloco de Notas que abrir, troque "COLOQUE_A_SENHA_AQUI" pela senha real
+do usuário do PostgreSQL. Salve e feche. Esse arquivo fica só nessa
+máquina — nunca vai pro código/Git.
+
+--- Criar o serviço do backend ---
+
+Abra o PowerShell COMO ADMINISTRADOR agora, na pasta do projeto, e rode:
+
+  deploy\install-backend-service.ps1
+
+Isso cria o serviço "FarmaciaEliseuBackend", já configurado pra: iniciar
+sozinho com o Windows, e reiniciar sozinho se travar ou cair.
+
+Teste abrindo no navegador: http://localhost:5080
+Deve aparecer a tela do sistema (Farmácia do Eliseu).
+
+--- Configurar o backup automático do banco (só na primeira vez) ---
+
+Ainda como Administrador:
+
+  deploy\configurar-pgpass.ps1
+
+Vai pedir a senha do PostgreSQL uma vez — ela fica guardada localmente
+nessa máquina (não em texto visível, não vai pro Git), só pra o backup
+automático conseguir rodar sozinho de madrugada sem travar esperando
+alguém digitar senha.
+
+Depois:
+
+  deploy\install-backup-task.ps1
+
+Isso agenda um backup do banco TODO DIA às 23:30 (pode mudar o horário com
+o parâmetro -Hora, ex.: -Hora "02:00"). Os backups ficam guardados em
+C:\FarmaciaEliseu\backups\ e os com mais de 30 dias são apagados
+automaticamente.
+
+Pra testar o backup na hora, sem esperar a noite:
+
+  Start-ScheduledTask -TaskName FarmaciaEliseuBackupBanco
+
+Confira se apareceu um arquivo novo em C:\FarmaciaEliseu\backups\.
+
+
+3. PASSO A PASSO EM CADA COMPUTADOR COM IMPRESSORA TÉRMICA
+----------------------------------------------------
+
+Repita isso em TODO computador que tem uma impressora térmica ligada nele
+(o vendedor bate o cupom nesse PC e o recibo sai na impressora dessa
+mesma máquina).
+
+3.1. Configure a impressora térmica como impressora PADRÃO do Windows
+     nessa máquina (Painel de Controle → Dispositivos e Impressoras →
+     clicar com botão direito na impressora → "Definir como impressora
+     padrão").
+
+3.2. Leve o agente de impressão pra essa máquina:
+     - Se essa máquina TEM o projeto clonado/copiado nela: rode
+       "deploy\publish.ps1" nela também (vai gerar
+       C:\FarmaciaEliseu\print-agent).
+     - Se NÃO tem: copie a pasta C:\FarmaciaEliseu\print-agent inteira do
+       servidor (ou de outra máquina que já publicou) pra essa máquina, no
+       mesmo caminho (C:\FarmaciaEliseu\print-agent).
+
+3.3. Como Administrador, na pasta do projeto (se tiver) ou de qualquer
+     lugar (o script usa caminho fixo por padrão):
+
+       deploy\install-print-agent-service.ps1
+
+     Se você só copiou a pasta print-agent sem o resto do projeto, baixe
+     só o arquivo deploy\install-print-agent-service.ps1 e rode ele
+     direto.
+
+3.4. Teste abrindo no navegador DESSA MESMA MÁQUINA:
+     http://localhost:9123/status
+     Deve responder com o nome da impressora padrão detectada.
+
+
+4. USANDO O SISTEMA NO DIA A DIA
+----------------------------------------------------
+
+Descubra o IP do servidor na rede local (no próprio servidor, rode
+"ipconfig" e veja o "Endereço IPv4", algo como 192.168.100.40).
+
+Em qualquer computador da rede (inclusive o servidor), abra o navegador
+em:
+
+  http://<IP-DO-SERVIDOR>:5080
+
+Exemplo: http://192.168.100.40:5080
+
+Vale a pena deixar esse endereço salvo como favorito/atalho na área de
+trabalho de cada computador, pra ninguém precisar digitar toda vez.
+
+Não precisa mais rodar "npm run dev" nem "dotnet run" em lugar nenhum —
+isso era só pra desenvolvimento. Uma vez instalado como serviço, o sistema
+fica ligado sozinho, mesmo depois de reiniciar o computador.
+
+
+5. ATUALIZANDO O SISTEMA DEPOIS (quando o código mudar)
+----------------------------------------------------
+
+No servidor:
+
+  deploy\publish.ps1
+  Restart-Service FarmaciaEliseuBackend
+
+Se o agente de impressão também mudou, em cada estação com impressora:
+
+  deploy\publish.ps1                        (ou copiar a pasta atualizada)
+  Restart-Service FarmaciaEliseuPrintAgent
+
+
+6. COMO SABER SE ESTÁ TUDO RODANDO
+----------------------------------------------------
+
+No servidor:
+
+  Get-Service FarmaciaEliseuBackend
+  Get-ScheduledTask FarmaciaEliseuBackupBanco
+
+Em cada estação com impressora:
+
+  Get-Service FarmaciaEliseuPrintAgent
+
+O status deve aparecer como "Running" (rodando). Se aparecer "Stopped"
+(parado), tente: Start-Service FarmaciaEliseuBackend (ou o nome do outro
+serviço).
+
+Erros ficam registrados no Visualizador de Eventos do Windows (procure por
+"Visualizador de Eventos" no menu Iniciar → Logs do Windows → Aplicativo).
+
+
+7. PROBLEMAS COMUNS
+----------------------------------------------------
+
+- "Não consigo acessar http://IP:5080 de outro computador": confirme que
+  o Firewall do Windows do servidor está liberando a porta 5080 (o
+  instalador do serviço não mexe no Firewall automaticamente — se
+  necessário, libere manualmente: Painel de Controle → Firewall do
+  Windows Defender → Configurações Avançadas → Regras de Entrada → Nova
+  Regra → Porta → TCP → 5080 → Permitir).
+
+- "O cupom não imprime": confirme que o agente está rodando NAQUELA
+  estação especificamente (http://localhost:9123/status nela) e que a
+  impressora térmica está configurada como padrão do Windows nela.
+
+- "Erro de conexão com o banco" ao abrir o sistema: confira se o
+  appsettings.Production.json em C:\FarmaciaEliseu\backend\ existe e tem a
+  senha certa (veja o passo 2).
+
+- "Preciso reinstalar/refazer um serviço do zero": rode
+  deploy\uninstall-services.ps1 (como Administrador) e depois o
+  install-*.ps1 correspondente de novo.
+
+
+FIM DO GUIA.
+Passo a passo mais técnico/resumido também disponível em deploy\README.md.

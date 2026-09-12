@@ -1,0 +1,27 @@
+# .NET
+backend/**/bin/
+backend/**/obj/
+print-agent/**/bin/
+print-agent/**/obj/
+*.user
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+
+# Front-end buildado e copiado para dentro do backend (gerado no dotnet publish)
+backend/**/wwwroot/*
+!backend/**/wwwroot/.gitkeep
+
+# Publicação (dotnet publish) e backups do banco
+publish/
+backups/
+
+# Configuração de produção com a connection string real (nunca comitar
+# senha) — copiar appsettings.Production.json.example e preencher na
+# máquina de produção.
+backend/**/appsettings.Production.json
+
+# IDE
+.vs/
+.vscode/
