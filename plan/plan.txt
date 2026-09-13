@@ -1017,3 +1017,37 @@ final.
 NÃO foi testado de verdade: a criação do serviço do Windows, da regra de
 firewall e da tarefa agendada (o usuário pediu para não instalar nada
 nesta máquina). É o único ponto do pacote sem execução real.
+
+
+================================================================
+PROVA: o sistema NÃO altera a estrutura do banco
+================================================================
+
+Verificação feita a pedido, antes de instalar no servidor de produção.
+
+Estático:
+ - Não existe pasta Migrations no projeto.
+ - Nenhuma ocorrência de EnsureCreated, EnsureDeleted, Migrate,
+   MigrateAsync, GenerateCreateScript, ExecuteSqlRaw, FromSqlRaw nem
+   ExecuteSqlInterpolated em todo o backend.
+ - Os pacotes EntityFrameworkCore.Design e .Tools NÃO estão instalados —
+   o projeto nem teria como gerar ou aplicar uma migration.
+ - O Program.cs só registra o DbContext (UseNpgsql). Não faz nenhuma
+   chamada ao banco na inicialização.
+ - O print-agent não tem nenhuma referência a banco de dados.
+
+Prático (rodando o executável extraído do ZIP que vai no pendrive, contra
+o banco real):
+ - Fotografei antes e depois: colunas (59 linhas), índices (14),
+   constraints (10), sequences (5) e contagem de linhas das 5 tabelas.
+   TUDO IDÊNTICO — inclusive as sequences, que avançariam ao menor INSERT.
+ - Contadores n_tup_ins / n_tup_upd / n_tup_del do pg_stat_user_tables:
+   capturados antes, depois de 44 requisições cobrindo todas as telas e
+   endpoints em 2 rodadas. NÃO MUDARAM NEM UMA UNIDADE.
+ - O contador de linhas apagadas (n_tup_del) está em 0 em todas as
+   tabelas desde sempre — confirma que o sistema nunca fez DELETE físico.
+
+Conclusão: instalar e abrir o sistema não altera nem a estrutura nem os
+dados. Gravação só acontece quando uma pessoa faz uma ação (finalizar
+venda, marcar como pago, salvar cadastro) — e exclusão é sempre soft
+delete.
