@@ -52,14 +52,14 @@ public class VendasController : ControllerBase
             return BadRequest("O preço de cada item não pode ser negativo.");
         }
 
-        var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.ClientesId == dto.ClientesId);
+        var cliente = await _context.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.ClientesId == dto.ClientesId);
         if (cliente is null) return BadRequest("Cliente não encontrado.");
 
-        var funcionario = await _context.Funcionarios.FirstOrDefaultAsync(f => f.FuncionariosId == dto.FuncionariosId);
+        var funcionario = await _context.Funcionarios.AsNoTracking().FirstOrDefaultAsync(f => f.FuncionariosId == dto.FuncionariosId);
         if (funcionario is null) return BadRequest("Funcionário não encontrado.");
 
         var produtosIds = dto.Itens.Select(i => i.ProdutosId).Distinct().ToList();
-        var produtos = await _context.Produtos.Where(p => produtosIds.Contains(p.ProdutosId)).ToListAsync();
+        var produtos = await _context.Produtos.AsNoTracking().Where(p => produtosIds.Contains(p.ProdutosId)).ToListAsync();
         var produtosPorId = produtos.ToDictionary(p => p.ProdutosId);
 
         var idProdutoFaltando = produtosIds.FirstOrDefault(id => !produtosPorId.ContainsKey(id));

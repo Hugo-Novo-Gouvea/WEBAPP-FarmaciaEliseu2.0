@@ -6,13 +6,13 @@ import { getErrorMessage } from '../utils/errors'
 // movimento; se a pessoa confirmar, imprime e pergunta de novo, repetindo até
 // ela cancelar. Usado nos 3 pontos de impressão: Movimentação, Vender e
 // Contas a Receber.
-export async function perguntarEImprimir(movimentosId: number): Promise<void> {
+export async function perguntarEImprimir(movimentosId: number, informarValor = true): Promise<void> {
   let querImprimir = window.confirm('Deseja imprimir o cupom?')
 
   while (querImprimir) {
     let base64: string
     try {
-      base64 = await movimentosApi.getCupom(movimentosId)
+      base64 = await movimentosApi.getCupom(movimentosId, informarValor)
     } catch (err) {
       window.alert(getErrorMessage(err, 'Não foi possível gerar o cupom desta venda.'))
       return

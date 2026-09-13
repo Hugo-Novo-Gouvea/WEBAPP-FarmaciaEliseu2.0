@@ -14,7 +14,7 @@ export async function imprimirViaAgente(base64: string): Promise<void> {
     })
   } catch {
     throw new Error(
-      'Não foi possível conectar ao agente de impressão. Verifique se ele está rodando neste computador (print-agent).',
+      'Não foi possível conectar a impressora. Verifique se o serviço está sendo executado',
     )
   }
 

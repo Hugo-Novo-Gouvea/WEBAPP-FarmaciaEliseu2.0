@@ -56,6 +56,7 @@ export function VenderPage() {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([])
 
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>('dinheiro')
+  const [informarValor, setInformarValor] = useState<'sim' | 'nao'>('sim')
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null)
   const [funcionarioId, setFuncionarioId] = useState<number | ''>('')
 
@@ -78,12 +79,10 @@ export function VenderPage() {
 
   const codigoBarrasRef = useRef<HTMLInputElement>(null)
 
+  // Começa sem cliente selecionado de propósito: se já viesse preenchido, é
+  // fácil esquecer de trocar e lançar a venda no cliente errado.
   useEffect(() => {
-    clientesApi.getAll().then((lista) => {
-      setClientes(lista)
-      const avulso = lista.find((c) => c.clientesId === CLIENTE_AVULSO_ID)
-      if (avulso) setClienteSelecionado(avulso)
-    })
+    clientesApi.getAll().then(setClientes)
     funcionariosApi.getAll().then(setFuncionarios)
   }, [])
 
@@ -221,11 +220,12 @@ export function VenderPage() {
 
       setSucesso(`Venda registrada (movimento #${resultado.movimentosId}) — total ${formatMoney(resultado.valorTotal)}.`)
       setCarrinho([])
-      setClienteSelecionado(clienteAvulso)
+      setClienteSelecionado(null)
       setFuncionarioId('')
       setFormaPagamento('dinheiro')
 
-      await perguntarEImprimir(resultado.movimentosId)
+      await perguntarEImprimir(resultado.movimentosId, informarValor === 'sim')
+      setInformarValor('sim')
     } catch (err) {
       setErro(getErrorMessage(err, 'Não foi possível finalizar a venda.'))
     } finally {
@@ -260,6 +260,23 @@ export function VenderPage() {
           </RadioGroup>
         </Paper>
 
+        <Paper sx={{ p: 2, flex: '1 1 220px' }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Informar valor
+          </Typography>
+          <RadioGroup
+            row
+            value={informarValor}
+            onChange={(e) => setInformarValor(e.target.value as 'sim' | 'nao')}
+          >
+            <FormControlLabel value="sim" control={<Radio />} label="Sim" />
+            <FormControlLabel value="nao" control={<Radio />} label="Não" />
+          </RadioGroup>
+          <Typography variant="caption" color="text.secondary">
+            Define se os valores saem impressos no cupom.
+          </Typography>
+        </Paper>
+
         <Paper sx={{ p: 2, flex: '2 1 320px' }}>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
             Cliente
@@ -272,7 +289,7 @@ export function VenderPage() {
               value={clienteSelecionado}
               onChange={(_, value) => setClienteSelecionado(value)}
               renderInput={(params) => <TextField {...params} placeholder="Buscar cliente cadastrado..." />}
-              sx={{ flexGrow: 1 }}
+              sx={{ flexGrow: 1, minWidth: 0 }}
               size="small"
             />
             <Chip
@@ -320,22 +337,28 @@ export function VenderPage() {
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
           <TextField
+            label="Qtd."
+            type="number"
+            value={quantidade}
+            onChange={(e) => setQuantidade(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                codigoBarrasRef.current?.focus()
+              }
+            }}
+            size="small"
+            sx={{ width: 100 }}
+          />
+          <TextField
             inputRef={codigoBarrasRef}
             label="Código de barras ou nome do produto"
             value={codigoBarras}
             onChange={(e) => setCodigoBarras(e.target.value)}
             onKeyDown={handleCodigoBarrasKeyDown}
             size="small"
-            sx={{ flexGrow: 1, minWidth: 260 }}
+            sx={{ flexGrow: 1, minWidth: 180 }}
             autoFocus
-          />
-          <TextField
-            label="Qtd."
-            type="number"
-            value={quantidade}
-            onChange={(e) => setQuantidade(e.target.value)}
-            size="small"
-            sx={{ width: 100 }}
           />
           <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setItemAvulsoAberto(true)}>
             Item avulso
@@ -343,7 +366,7 @@ export function VenderPage() {
         </Box>
 
         <TableContainer>
-          <Table size="small">
+          <Table size="small" sx={{ minWidth: 720 }}>
             <TableHead>
               <TableRow>
                 <TableCell>Produto</TableCell>
@@ -389,7 +412,7 @@ export function VenderPage() {
         </TableContainer>
       </Paper>
 
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
         {descontoTotalGeral > 0 && (
           <Typography variant="body2" color="text.secondary">
             Desconto total: -{formatMoney(descontoTotalGeral)}

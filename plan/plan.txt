@@ -604,3 +604,416 @@ máquina (são mudanças persistentes no sistema operacional, e esta é a
 máquina de desenvolvimento, não o servidor real da farmácia) — só validei
 a sintaxe de todos os scripts .ps1 (sem erro) e testei manualmente a lógica
 de cada um onde era seguro fazer isso sem alterar o Windows desta máquina.
+
+
+================================================================
+RESPONSIVIDADE (celular / tablet)
+================================================================
+
+Problema encontrado: o sistema não era responsivo. O menu lateral era um
+Drawer "permanent" de 240px fixos, sem nenhum ponto de quebra — num celular
+de 390px ele ocupava 62% da tela. O Chrome então desistia do layout e dava
+zoom-out na página inteira pra tentar encaixar (medi window.innerWidth = 809
+em vez de 390), deixando tudo minúsculo e com rolagem lateral.
+
+Correções:
+
+1. layout/Layout.tsx — menu responsivo. Acima de 900px (md) continua
+   EXATAMENTE como antes: Drawer permanente de 240px, sem barra no topo.
+   Abaixo de 900px: barra vermelha no topo com botão hambúrguer e um Drawer
+   "temporary" que abre por cima e fecha sozinho ao escolher uma opção. Os
+   dois Drawers compartilham o mesmo conteúdo (mesmo gradiente, mesmos
+   itens) e a troca é por CSS (display por breakpoint), não por JavaScript,
+   pra não ter piscada nem remontagem de componente.
+
+2. layout/Layout.tsx — "minWidth: 0" no <main>. Essa é a correção que faz
+   as tabelas rolarem sozinhas em vez de esticarem a página. Num flex
+   container o item tem min-width:auto por padrão, ou seja, se recusa a
+   encolher abaixo da largura do conteúdo — por isso o overflow-x do
+   TableContainer do MUI nunca chegava a funcionar.
+
+3. Tabelas: "minWidth" em cada <Table> (560 a 900px conforme o número de
+   colunas), pra elas rolarem horizontalmente dentro do próprio quadro em
+   vez de espremer as colunas até ficarem ilegíveis. No desktop isso não
+   muda nada, porque lá a tela já é mais larga que esse mínimo.
+
+4. Cabeçalhos de tela (título + busca + botão) ganharam flexWrap, e os
+   campos de busca um minWidth pequeno, pra quebrarem em linhas no celular
+   em vez de estourar a largura. Mesma coisa no rodapé da tela Vender
+   (total + Finalizar Venda) e nos botões do diálogo de detalhe.
+
+Validação: testei as 8 telas em 360px, 390px (iPhone 13), 768px, 899px e
+900px — em todas, scrollWidth == largura da tela (nenhuma rolagem lateral
+indevida) e o modo certo (hambúrguer abaixo de 900, menu fixo a partir de
+900). Confirmei que no desktop (1440px) nada mudou: menu permanente de
+240px, sem barra no topo, mesmas telas de antes. Testei também abrir o
+menu hambúrguer e navegar por ele (fecha sozinho), o diálogo de detalhe do
+movimento no celular (cabe na tela, botões quebram em duas linhas) e a aba
+"Abater Itens". Nenhuma gravação no banco foi feita nesses testes — só
+leitura.
+
+
+================================================================
+AJUSTES DE USABILIDADE (máscara de dinheiro + visualizar)
+================================================================
+
+1. Máscara de dinheiro (utils/format.ts): formatMoney passou a usar vírgula
+   separando reais de centavos, sem separador de milhar — "R$ 192919,78"
+   em vez de "R$ 192919.78". Como é o helper compartilhado, valeu pra
+   todas as telas de uma vez (é só exibição; nenhum valor enviado pra API
+   passa por ele).
+
+2. Visualizar no CRUD (components/CrudPage.tsx): clicar em cima da linha
+   abre um diálogo "Detalhes" com TODOS os campos do registro (não só as
+   colunas que aparecem na tabela), com um botão "Editar" que leva direto
+   pro formulário preenchido. Vale automaticamente pras três telas
+   (Clientes, Funcionários, Produtos), porque as três usam o mesmo
+   CrudPage. Os botões de lápis/lixeira da linha continuam funcionando
+   como antes — usam stopPropagation pra não abrir a visualização junto.
+   Os campos de detalhe reaproveitam o "format" já declarado na coluna
+   equivalente; onde o campo não é coluna, dá pra declarar o format no
+   próprio campo (foi o caso do Preço de Compra, em ProdutosPage).
+
+3. Movimentação (pages/MovimentacaoPage.tsx): o detalhe agora abre ao
+   clicar em qualquer lugar da linha. A coluna "Detalhes" com o ícone de
+   olho foi removida.
+
+Validação: conferi a máscara nas telas (Início mostrando R$ 192919,78 e
+R$ 1321,14), abri a visualização nas três telas de cadastro, confirmei que
+o lápis ainda abre "Editar registro" (e não a visualização), que o botão
+"Editar" de dentro do detalhe abre o formulário já preenchido, e que em
+Movimentação não sobrou nenhum ícone de olho e o clique na linha abre o
+diálogo. Testado também no celular (390px): os diálogos cabem na tela.
+Nenhuma gravação no banco nesses testes — só leitura.
+
+
+================================================================
+CONTAS A RECEBER / COBRANÇA — clique na linha e cobrança só consulta
+================================================================
+
+1. Contas a Receber e Cobrança: o detalhe do movimento agora abre clicando
+   em qualquer lugar da linha, além do ícone de olho (que continua lá). Os
+   ícones da coluna "Ações" usam stopPropagation pra não disparar a
+   visualização junto — confirmado que clicar em "marcar como pago" não
+   abre o diálogo.
+
+2. Cobrança virou área só de consulta: removido o botão de "marcar como
+   pago" da linha, e o diálogo de detalhe abre sem "Cancelar Venda",
+   "Imprimir" nem "Marcar como pago" — só o botão Fechar. Isso foi feito
+   com uma prop nova "somenteLeitura" no MovimentoDetalheDialog, então
+   Movimentação e Contas a Receber continuam exatamente como estavam
+   (validado: os botões desses dois seguem aparecendo).
+
+Validação: conferi que em Cobrança sobrou só o olho na linha (nenhum ícone
+de marcar pago), que o diálogo lá mostra apenas "Fechar", e que em
+Movimentação e Contas a Receber os botões de ação continuam intactos.
+Nenhuma gravação no banco nesses testes — o window.confirm de "marcar como
+pago" foi cancelado no teste, e o fechamento de caixa do dia confirmou
+zero vendas e zero recebimentos.
+
+
+================================================================
+CONTAS A RECEBER — refeita como fluxo "cliente primeiro"
+================================================================
+
+A tela deixou de ter abas. Agora é um fluxo só:
+  1. O usuário informa o nome do cliente (autocomplete).
+  2. A tela lista TODOS os itens por movimento em aberto daquele cliente.
+  3. Seleciona os itens (clicando na linha ou no checkbox; tem também
+     "selecionar todos" no cabeçalho).
+  4. "Dar Baixa" quita o total selecionado, ou "Resto de Conta" registra um
+     pagamento parcial e lança a diferença como novo movimento.
+
+As duas abas antigas ("Por Venda" e "Abater Itens") foram removidas — com
+o cliente escolhido antes, dá pra chegar no mesmo resultado do "marcar
+venda inteira como paga" usando o "selecionar todos". O componente
+components/AbaterItensSection.tsx foi apagado (só era usado aqui).
+
+Backend: ItensReceberController.GetAll ganhou o parâmetro opcional
+"clientesId", que filtra por movimento.clientes_id. É filtro por ID, não
+por texto — evita misturar clientes de nome parecido. O endpoint /quitar
+não mudou (a trava de concorrência e a regra de "todos do mesmo cliente"
+continuam iguais).
+
+Dois ajustes achados durante o teste:
+ - Enquanto carrega, a tela mostrava "0 item(ns) em aberto" e "Nenhum item
+   em aberto para este cliente", como se o cliente não devesse nada.
+   Agora mostra "Carregando...".
+ - Enquanto carregava o novo cliente, as linhas do cliente ANTERIOR
+   continuavam na tela e eram clicáveis/selecionáveis — dava pra quitar
+   item do cliente errado. Agora as linhas só aparecem depois que a
+   consulta termina.
+
+Validação: com ZULMIRA DE FREITAS ZANON aparecem os 10 itens em aberto
+dela (6 movimentos diferentes, R$ 2454,61), conferido contra a API. Testado
+selecionar por clique na linha, "selecionar todos", a confirmação do "Dar
+Baixa" (cancelada de propósito, nada gravado), o diálogo de Resto de Conta
+e a troca de cliente (zera a seleção). Testado também em celular (390px),
+sem estouro lateral.
+
+
+================================================================
+LOTE DE AJUSTES (8 itens)
+================================================================
+
+1. Funcionários: "Código Antigo" saiu da listagem e do formulário (dado do
+   sistema antigo). Cadastro novo grava 0; na edição, o valor que já existe
+   no banco é preservado (não sobrescreve dado real).
+
+2. Produtos: "Preço de Compra" saiu do formulário pelo mesmo motivo.
+   Continua existindo na tabela; cadastro novo grava 0 e a edição preserva
+   o que já está lá.
+
+3. Produtos: Descrição, Preço de Venda e Código de Barras agora são
+   obrigatórios DE VERDADE. Antes o "required" só desenhava o asterisco —
+   não bloqueava nada, porque o formulário não é um <form> e o salvar não
+   validava. Agora o CrudPage checa os campos obrigatórios antes de chamar
+   a API e mostra "Preencha: ..." sem fechar o diálogo.
+
+4. Contas a Receber: itens ordenados por data da venda do mais novo para o
+   mais antigo (ItensReceberController: OrderByDescending).
+
+5. Mensagem de erro de impressão trocada para "Não foi possível conectar a
+   impressora. Verifique se o serviço está sendo executado".
+
+6. Vender: o campo "Qtd." vem antes do campo de produto, e Enter na
+   quantidade joga o foco para o campo de produto. O autofoco ao abrir a
+   tela continua no campo de produto, para não atrapalhar quem só passa o
+   leitor de código de barras (caso mais comum).
+
+7. Vender: começa sem cliente selecionado (antes vinha "CLIENTE NAO
+   INFORMADO" preenchido, e era fácil esquecer de trocar e lançar a venda
+   no cliente errado). O botão "Avulso" continua ali para escolher na mão,
+   e finalizar sem cliente é bloqueado com "Selecione um cliente.".
+
+8. Vender: campo "Informar valor" (Sim/Não). Com "Não", o cupom sai sem
+   nenhum valor — sem a coluna TOTAL nos itens e sem o bloco de totais;
+   o resto do cupom (cliente, vendedor, fichário, itens, assinatura) fica
+   igual. Implementado como parâmetro de impressão: GET
+   /movimentos/{id}/cupom?informarValor=false. O padrão continua true, e a
+   regra antiga de fiado (esconder valores e escrever APRAZO) não mudou.
+   O campo fica na tela Vender e vale para a impressão daquela venda; as
+   reimpressões por Movimentação/Contas a Receber continuam saindo com
+   valor.
+
+Validação: conferidos na tela os 8 itens (colunas e formulários de
+Funcionários/Produtos, bloqueio real ao salvar produto incompleto, ordem
+decrescente em Contas a Receber, ordem dos campos e foco em Vender, cliente
+vazio, campo Informar valor). O cupom foi gerado pela API nas duas versões
+e decodificado para comparar linha a linha. A mensagem nova de impressora
+foi vista no erro real (print-agent desligado nesta máquina).
+
+Complemento: em Contas a Receber, o total dos itens selecionados virou um
+campo "Valor" (somente leitura, em negrito, ao lado dos botões), que vai
+somando conforme o usuário marca e desmarca itens. Antes essa informação
+existia só como texto solto no rodapé. Conferido item a item: cada clique
+soma exatamente o valor da linha, desmarcar subtrai, "selecionar todos"
+bate com a soma da página e limpar volta a R$ 0,00. Testado também no
+celular.
+
+
+================================================================
+DESEMPENHO — revisão e primeiras correções
+================================================================
+
+Medições feitas no ambiente real (banco com 58.877 produtos, 48.066
+movimentos, 117.368 itens, 1.584 clientes; ~45 MB no total em disco).
+
+ACHADOS (em ordem de impacto):
+
+1. /api/produtos não tem paginação: devolve os 58.877 produtos de uma vez
+   (21,2 MB de JSON). A tela levava 1.063 ms para aparecer e a aba do
+   navegador ficava com 104 MB (as outras telas ficam em 28-32 MB). A
+   paginação e a busca do CrudPage são feitas no navegador, e o filtro roda
+   sobre os 58 mil itens a cada tecla, sem debounce. NÃO CORRIGIDO AINDA.
+
+2. Sem compressão HTTP no servidor. CORRIGIDO.
+
+3. /api/clientes devolve os 1.584 clientes (438 KB) ao abrir Clientes,
+   Vender e Contas a Receber. NÃO CORRIGIDO AINDA.
+
+4. Nenhuma consulta usava AsNoTracking. CORRIGIDO.
+
+5. Busca por código de barras, nome de produto e nome de cliente fazem
+   varredura completa da tabela (não há índice em codigo_barras, descricao
+   nem clientes_nome). Menos grave do que parece: o banco inteiro cabe no
+   shared_buffers de 128 MB do Postgres, então a varredura fica em RAM
+   (5 ms medidos). Criar índice é mudança de esquema — não feito, depende
+   de autorização.
+
+6. Bundle único de 673 KB, sem divisão de código. NÃO CORRIGIDO AINDA.
+
+O QUE FOI FEITO:
+
+- Program.cs: AddResponseCompression + UseResponseCompression, com Gzip e
+  Brotli no nível "Fastest" (o servidor da farmácia não é potente, e o
+  nível máximo gastaria CPU sem compensar). Gzip registrado ANTES do
+  Brotli de propósito: medido neste banco, no nível Fastest o gzip
+  comprime melhor (2,6 MB contra 3,7 MB na lista de produtos). Resultado
+  com o cabeçalho que o navegador manda de verdade:
+    /api/produtos  21.209.654 -> 2.661.449 bytes (8x menor)
+    /api/clientes     448.044 ->   113.631 bytes (3,9x menor)
+
+- AsNoTracking() em todas as consultas SOMENTE LEITURA dos controllers
+  (Produtos, Clientes, Funcionarios, Movimentos, ItensReceber, Dashboard,
+  Vendas). As leituras que são seguidas de gravação continuam rastreadas
+  de propósito — em especial a lista "movimentos" do ItensReceber.Quitar,
+  que é alterada depois para fechar o movimento (tem comentário no código
+  explicando). Update e Delete de todos os CRUDs também seguem rastreados.
+
+Validação: testei o ciclo completo de gravação (criar -> editar -> reler ->
+excluir) num produto de teste criado por mim, porque um AsNoTracking no
+lugar errado faria o UPDATE sumir silenciosamente — a edição persistiu
+(preço 9,99 -> 77,77) e o soft delete gravou (deletado = t). O produto de
+teste foi removido por soft delete no fim. As 9 telas foram abertas sem
+nenhum erro de console, e o detalhe de movimento e o Contas a Receber
+continuam funcionando.
+
+
+================================================================
+VERIFICAÇÃO COMPLETA (revisão geral de tudo que foi feito)
+================================================================
+
+~60 conferências automatizadas no navegador e na API. Nenhuma falha real.
+
+A) Telas e regras (30 conferências): máscara de dinheiro com vírgula e sem
+   separador de milhar; Funcionários só com Nome; Produtos sem Preço de
+   Compra e com os 3 obrigatórios bloqueando de verdade (inclusive na
+   edição, se apagar um obrigatório); visualizar por clique na linha nos 3
+   cadastros com o lápis ainda abrindo Editar; Movimentação sem o ícone de
+   olho e abrindo pela linha, mantendo Cancelar Venda + Imprimir; Cobrança
+   só consulta (diálogo só com Fechar) e com o filtro de dias funcionando;
+   Vender com cliente vazio, Qtd antes do produto, Enter movendo o foco,
+   campo Informar valor e bloqueio de venda sem cliente; Contas a Receber
+   no fluxo cliente-primeiro, ordenado do mais novo pro mais antigo, com o
+   campo Valor somando certo. Zero erros de console em todas as telas.
+
+B) Responsividade (54 combinações: 9 telas x 6 larguras — 360, 390, 768,
+   899, 900 e 1440): nenhuma tela estoura a largura, o modo (hambúrguer
+   abaixo de 900, menu fixo de 240px a partir de 900) está certo em todas,
+   o menu do celular abre com os 9 itens e fecha sozinho ao navegar, e as
+   tabelas rolam dentro do próprio quadro em vez de esticar a página.
+
+C) Venda ponta a ponta (dados de teste meus, revertidos no fim): cadastro
+   de cliente pelo próprio PDV, item avulso 2 x R$ 10,50, fiado, sem
+   informar valor -> venda gravada (R$ 21,00), pergunta de impressão,
+   carrinho e cliente resetados. A venda apareceu em Movimentação como
+   Pendente com o valor certo, o detalhe mostrou o item, e apareceu em
+   Contas a Receber com o campo Valor somando R$ 21,00.
+
+D) API: cupom com valor (fiado -> APRAZO) e sem valor (sem coluna TOTAL e
+   sem bloco de totais); fechamento de caixa do dia; trava de concorrência
+   testada de verdade com duas quitações simultâneas do mesmo item (uma
+   200, outra 409 com mensagem clara, sem quitação dupla); e a regra de
+   fechar o movimento sozinho quando todos os itens dele são quitados.
+
+E) Desempenho: compressão ativa (Content-Encoding: gzip, 21,2 MB -> 2,66 MB
+   em /api/produtos). Builds do frontend e do backend sem erro.
+
+Duas "falhas" da primeira rodada eram erro do meu teste, não do programa: o
+MUI escreve o asterisco de campo obrigatório com espaço fino (U+2009) e não
+espaço normal, o que quebrava a comparação de texto. Reconferido com o
+caractere normalizado: passa.
+
+ACHADO NOVO: o build acusa NU1903 — o pacote Microsoft.OpenApi 2.0.0
+(dependência transitiva de Microsoft.AspNetCore.OpenApi 10.0.2) tem
+vulnerabilidade conhecida de gravidade alta. O risco prático aqui é baixo,
+porque o MapOpenApi só é registrado em Development (não roda no serviço
+publicado) e o sistema fica só na rede local, mas vale atualizar.
+
+Banco: todos os registros que criei nos testes estão com deletado = true
+(cliente 1585, movimento 48067, item 117369, produto 58878, e o cliente
+1582 de sessão anterior). Os itens em aberto voltaram a exatamente 4215,
+igual ao baseline. Os 4 clientes reais cujo nome contém "CLAUDE"
+(CLAUDENIA, CLAUDETE x2, CLAUDEMIRA) não foram tocados. Os dados de teste
+do usuário (Cliente Teste 10 e as vendas dele) foram preservados.
+
+
+================================================================
+PACOTE DE INSTALAÇÃO (pendrive)
+================================================================
+
+Gerado FarmaciaEliseu-Instalacao.zip (96 MB) na raiz do repositório, para
+levar no pendrive até o servidor da farmácia. A pasta pacote-instalacao/ e
+o .zip entraram no .gitignore (são gerados, não código).
+
+Decisão importante: publicado como SELF-CONTAINED (win-x64). O servidor não
+precisa de .NET SDK, nem runtime, nem Node — antes o instalacao.txt exigia
+instalar o SDK e o Node no servidor só para conseguir buildar lá. Agora é
+só descompactar e rodar. Custo: o pacote fica com ~220 MB descompactado
+(96 MB zipado), o que é irrelevante num pendrive.
+
+Conteúdo:
+  LEIA-ME-INSTALACAO.txt   guia passo a passo, escrito para ser seguido
+                           sozinho no servidor
+  instalar-servidor.ps1    faz TUDO no servidor num comando só: confere
+                           Administrador e PostgreSQL, copia o programa,
+                           pede a senha do banco, grava o
+                           appsettings.Production.json, cria o serviço do
+                           Windows (auto-start + auto-restart), libera a
+                           porta 5080 no firewall, grava o pgpass e agenda
+                           o backup diário. No fim testa de verdade
+                           (GET /api/funcionarios) e mostra o IP de acesso.
+  instalar-impressora.ps1  para cada PC com impressora térmica: confere a
+                           impressora padrão, copia o agente, cria o
+                           serviço e testa o /status.
+  desinstalar.ps1          remove serviços, tarefa e regra de firewall.
+                           Não toca no banco nem apaga os backups.
+  backup-database.ps1      agora acha o pg_dump sozinho (procura em
+                           C:\Program Files\PostgreSQL), em vez de ter a
+                           versão 18 fixa no caminho.
+  backend/ e print-agent/  executáveis self-contained, com a tela React já
+                           embutida em backend/wwwroot.
+
+O instalador também é o ATUALIZADOR: rodado de novo, ele para o serviço,
+substitui os arquivos e RE-APROVEITA a senha do banco já configurada (não
+pergunta de novo). O banco nunca é tocado.
+
+Segurança: confirmado que não há nenhuma senha dentro do pacote (procurei
+a senha real no conteúdo — nada) e que não existe appsettings.Production
+no zip. O appsettings.Development.json foi retirado. Como o servidor da
+farmácia já tem o PostgreSQL com os dados, nenhum dado de cliente sai
+daqui no pendrive.
+
+Validação: publiquei self-contained, rodei o executável publicado de
+verdade (tela, rota do React com fallback, API e compressão gzip todos
+respondendo), conferi as 4 telas no navegador sem erro de console,
+extraí o ZIP num diretório limpo e rodei o executável A PARTIR DA
+EXTRAÇÃO — tela, rota do React e API responderam 200, que é exatamente o
+teste que o instalador faz no final. Os 4 scripts .ps1 passaram na
+validação de sintaxe do PowerShell. FALTA testar o instalador rodando de
+verdade (criar serviço/firewall/tarefa agendada), que é mudança
+persistente no Windows desta máquina de desenvolvimento.
+
+Correção de dois problemas achados na auditoria do pacote (antes de
+entregar, sem instalar nada nesta máquina):
+
+1. O zip tinha uma pasta-embrulho com o mesmo nome do arquivo. O "Extrair
+   tudo" do Windows sugere criar uma pasta com o nome do zip e joga o
+   conteúdo dentro — o resultado real seria
+   C:\FarmaciaEliseu-Instalacao\FarmaciaEliseu-Instalacao\..., e o comando
+   do guia não acharia o script. Refeito o zip com os arquivos na raiz;
+   simulei a extração e agora cai exatamente no caminho do guia. Os dois
+   instaladores também passaram a detectar o caso de pasta-dentro-de-pasta
+   e mostrar o caminho certo, e o guia ganhou esse item no "se der
+   problema".
+
+2. O instalar-servidor.ps1 tinha uma mensagem apontando para um
+   "configurar-backup.ps1" que não existe no pacote. Trocada por uma
+   verificação real (checa se a tarefa agendada já existe) com orientação
+   que funciona.
+
+Auditoria estática feita (já que não foi possível instalar de verdade
+nesta máquina): todos os nomes citados no guia (serviços, tarefa agendada,
+regra de firewall, caminhos e URLs) conferidos um a um contra o que os
+scripts realmente criam; todos os .ps1 citados no guia existem; os 4
+scripts passam na validação de sintaxe; e os 17 cmdlets usados
+(New-Service, New-NetFirewallRule, Register-ScheduledTask etc.) foram
+verificados como existentes no Windows. Por fim, extraí o zip final e
+rodei o executável de dentro da extração: tela e /api/funcionarios
+responderam 200 — que é exatamente a checagem que o instalador faz no
+final.
+
+NÃO foi testado de verdade: a criação do serviço do Windows, da regra de
+firewall e da tarefa agendada (o usuário pediu para não instalar nada
+nesta máquina). É o único ponto do pacote sem execução real.

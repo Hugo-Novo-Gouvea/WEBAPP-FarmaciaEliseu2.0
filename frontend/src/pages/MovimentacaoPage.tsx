@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   Box,
   Chip,
-  IconButton,
   Paper,
   Table,
   TableBody,
@@ -14,7 +13,6 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import VisibilityIcon from '@mui/icons-material/Visibility'
 import { movimentosApi } from '../api/movimentos'
 import type { Movimento } from '../types/Movimento'
 import { formatDateTime, formatMoney } from '../utils/format'
@@ -65,14 +63,14 @@ export function MovimentacaoPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2, flexWrap: 'wrap' }}>
         <Typography variant="h5">Movimentação</Typography>
         <TextField
           size="small"
           placeholder="Buscar por cliente, funcionário ou código..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          sx={{ flexGrow: 1, maxWidth: 360 }}
+          sx={{ flexGrow: 1, minWidth: 160, maxWidth: 360 }}
         />
       </Box>
 
@@ -83,7 +81,7 @@ export function MovimentacaoPage() {
       )}
 
       <TableContainer component={Paper}>
-        <Table size="small">
+        <Table size="small" sx={{ minWidth: 760 }}>
           <TableHead>
             <TableRow>
               <TableCell>Código</TableCell>
@@ -92,12 +90,16 @@ export function MovimentacaoPage() {
               <TableCell>Data da Venda</TableCell>
               <TableCell align="right">Valor Total</TableCell>
               <TableCell>Pagamento</TableCell>
-              <TableCell align="right">Detalhes</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {items.map((m) => (
-              <TableRow key={m.movimentosId} hover>
+              <TableRow
+                key={m.movimentosId}
+                hover
+                onClick={() => openDetalhe(m.movimentosId)}
+                sx={{ cursor: 'pointer' }}
+              >
                 <TableCell>{m.codigoMovimento ?? m.movimentosId}</TableCell>
                 <TableCell>{m.clientesNome}</TableCell>
                 <TableCell>{m.funcionariosNome}</TableCell>
@@ -110,16 +112,11 @@ export function MovimentacaoPage() {
                     <Chip label="Pendente" color="warning" size="small" variant="outlined" />
                   )}
                 </TableCell>
-                <TableCell align="right">
-                  <IconButton size="small" onClick={() => openDetalhe(m.movimentosId)} aria-label="ver itens">
-                    <VisibilityIcon fontSize="small" />
-                  </IconButton>
-                </TableCell>
               </TableRow>
             ))}
             {!loading && items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={6} align="center">
                   Nenhum movimento encontrado.
                 </TableCell>
               </TableRow>

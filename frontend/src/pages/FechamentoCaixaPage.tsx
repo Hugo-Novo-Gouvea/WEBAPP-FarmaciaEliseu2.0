@@ -107,7 +107,7 @@ export function FechamentoCaixaPage() {
         Por funcionário
       </Typography>
       <TableContainer component={Paper}>
-        <Table size="small">
+        <Table size="small" sx={{ minWidth: 360 }}>
           <TableHead>
             <TableRow>
               <TableCell>Funcionário</TableCell>

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import {
+  Alert,
   Box,
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Grid,
   IconButton,
   Paper,
   Table,
@@ -21,6 +23,7 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
+import CloseIcon from '@mui/icons-material/Close'
 import { getErrorMessage } from '../utils/errors'
 
 type FieldType = 'text' | 'number' | 'date'
@@ -30,6 +33,8 @@ export interface FieldConfig<TInput> {
   label: string
   type: FieldType
   required?: boolean
+  /** Só afeta a exibição na tela de detalhes, não o formulário de edição. */
+  format?: (value: TInput[keyof TInput]) => string
 }
 
 export interface ColumnConfig<T> {
@@ -73,9 +78,11 @@ export function CrudPage<T extends object, TInput extends object>({
   const [formValues, setFormValues] = useState<TInput>(emptyInput)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [erroForm, setErroForm] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(25)
+  const [visualizando, setVisualizando] = useState<T | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -98,12 +105,14 @@ export function CrudPage<T extends object, TInput extends object>({
   const openCreate = () => {
     setEditingId(null)
     setFormValues(emptyInput)
+    setErroForm(null)
     setDialogOpen(true)
   }
 
   const openEdit = (item: T) => {
     setEditingId(Number(item[idKey]))
     setFormValues(toInput(item))
+    setErroForm(null)
     setDialogOpen(true)
   }
 
@@ -117,6 +126,19 @@ export function CrudPage<T extends object, TInput extends object>({
   }
 
   const handleSave = async () => {
+    const faltando = fields
+      .filter((field) => field.required)
+      .filter((field) => {
+        const valor = formValues[field.key]
+        return valor === null || valor === undefined || String(valor).trim() === ''
+      })
+
+    if (faltando.length > 0) {
+      setErroForm(`Preencha: ${faltando.map((f) => f.label).join(', ')}.`)
+      return
+    }
+    setErroForm(null)
+
     setSaving(true)
     try {
       if (editingId === null) {
@@ -144,6 +166,19 @@ export function CrudPage<T extends object, TInput extends object>({
     }
   }
 
+  // Na tela de detalhes, reaproveita o format já declarado na coluna
+  // equivalente (ex.: dinheiro) quando o próprio campo não declara um.
+  const formatDaColuna = new Map(
+    columns.filter((col) => col.format).map((col) => [String(col.key), col.format!]),
+  )
+
+  const valorExibido = (field: FieldConfig<TInput>, valor: TInput[keyof TInput]) => {
+    if (valor === null || valor === undefined || valor === '') return '-'
+    if (field.format) return field.format(valor)
+    const formatColuna = formatDaColuna.get(String(field.key))
+    return formatColuna ? formatColuna(valor as unknown as T[keyof T]) : String(valor)
+  }
+
   const filteredItems = searchKey
     ? items.filter((item) =>
         String(item[searchKey] ?? '')
@@ -156,7 +191,7 @@ export function CrudPage<T extends object, TInput extends object>({
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2, flexWrap: 'wrap' }}>
         <Typography variant="h5">{title}</Typography>
         {searchKey && (
           <TextField
@@ -167,7 +202,7 @@ export function CrudPage<T extends object, TInput extends object>({
               setSearch(e.target.value)
               setPage(0)
             }}
-            sx={{ flexGrow: 1, maxWidth: 320 }}
+            sx={{ flexGrow: 1, minWidth: 160, maxWidth: 320 }}
           />
         )}
         <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
@@ -182,7 +217,7 @@ export function CrudPage<T extends object, TInput extends object>({
       )}
 
       <TableContainer component={Paper}>
-        <Table size="small">
+        <Table size="small" sx={{ minWidth: 560 }}>
           <TableHead>
             <TableRow>
               {columns.map((col) => (
@@ -193,17 +228,36 @@ export function CrudPage<T extends object, TInput extends object>({
           </TableHead>
           <TableBody>
             {pagedItems.map((item) => (
-              <TableRow key={String(item[idKey])}>
+              <TableRow
+                key={String(item[idKey])}
+                hover
+                onClick={() => setVisualizando(item)}
+                sx={{ cursor: 'pointer' }}
+              >
                 {columns.map((col) => (
                   <TableCell key={String(col.key)}>
                     {col.format ? col.format(item[col.key]) : String(item[col.key] ?? '')}
                   </TableCell>
                 ))}
                 <TableCell align="right">
-                  <IconButton size="small" onClick={() => openEdit(item)} aria-label="editar">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openEdit(item)
+                    }}
+                    aria-label="editar"
+                  >
                     <EditIcon fontSize="small" />
                   </IconButton>
-                  <IconButton size="small" onClick={() => handleDelete(item)} aria-label="excluir">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete(item)
+                    }}
+                    aria-label="excluir"
+                  >
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </TableCell>
@@ -233,9 +287,51 @@ export function CrudPage<T extends object, TInput extends object>({
         />
       </TableContainer>
 
+      <Dialog open={visualizando !== null} onClose={() => setVisualizando(null)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Detalhes
+          <IconButton onClick={() => setVisualizando(null)} size="small">
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {visualizando && (
+            <Grid container spacing={2}>
+              {fields.map((field) => {
+                const valores = toInput(visualizando)
+                return (
+                  <Grid key={String(field.key)} size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      {field.label}
+                    </Typography>
+                    <Typography>{valorExibido(field, valores[field.key])}</Typography>
+                  </Grid>
+                )
+              })}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ flexWrap: 'wrap' }}>
+          <Button
+            startIcon={<EditIcon />}
+            onClick={() => {
+              const item = visualizando!
+              setVisualizando(null)
+              openEdit(item)
+            }}
+          >
+            Editar
+          </Button>
+          <Button variant="contained" onClick={() => setVisualizando(null)}>
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="sm">
         <DialogTitle>{editingId === null ? `Novo registro` : `Editar registro`}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+          {erroForm && <Alert severity="warning">{erroForm}</Alert>}
           {fields.map((field) => (
             <TextField
               key={String(field.key)}

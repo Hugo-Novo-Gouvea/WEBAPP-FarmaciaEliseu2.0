@@ -1,0 +1,248 @@
+=====================================================================
+ FARMACIA DO ELISEU - COMO INSTALAR
+=====================================================================
+
+Voce vai precisar de:
+  - O pendrive com esta pasta.
+  - Acesso de administrador no servidor (a maquina que tem o
+    PostgreSQL com o banco FarmaciaEliseu).
+  - A SENHA do usuario "postgres" do PostgreSQL.
+
+Voce NAO precisa instalar mais nada no servidor. Nem .NET, nem Node,
+nem nada. Esta tudo dentro desta pasta.
+
+
+---------------------------------------------------------------------
+ PARTE 1 - NO SERVIDOR  (uma vez so)
+---------------------------------------------------------------------
+
+PASSO 1. Espete o pendrive e COPIE o arquivo
+         FarmaciaEliseu-Instalacao.zip para o disco C: do servidor.
+
+         IMPORTANTE: descompacte e rode a partir do DISCO, nao direto
+         do pendrive. Se rodar do pendrive e ele for removido no
+         meio, a instalacao quebra.
+
+         Agora descompacte:
+           - Clique com o botao DIREITO no arquivo .zip
+           - Escolha "Extrair tudo..."
+           - Na caixa que abrir, deixe o caminho que ele ja sugere:
+                 C:\FarmaciaEliseu-Instalacao
+           - Clique em "Extrair"
+
+         Ao terminar, abra C:\FarmaciaEliseu-Instalacao e confira que
+         voce ve ESTES itens SOLTOS ali dentro:
+
+             backend
+             print-agent
+             instalar-servidor.ps1
+             instalar-impressora.ps1
+             desinstalar.ps1
+             backup-database.ps1
+             LEIA-ME-INSTALACAO.txt
+
+         Se em vez disso voce ver UMA pasta so, com o mesmo nome
+         dentro, entre nela - e de la que voce roda. (O instalador
+         tambem avisa se isso acontecer.)
+
+
+PASSO 2. Abra o PowerShell COMO ADMINISTRADOR:
+
+           - Clique no menu Iniciar
+           - Digite: powershell
+           - Clique com o botao DIREITO em "Windows PowerShell"
+           - Escolha "Executar como administrador"
+           - Se aparecer "Deseja permitir...", clique em Sim
+
+         A janela azul que abrir tem que ter a palavra
+         "Administrador" no titulo. Se nao tiver, refaca.
+
+
+PASSO 3. Copie e cole a linha abaixo NA JANELA AZUL e aperte ENTER:
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File "C:\FarmaciaEliseu-Instalacao\instalar-servidor.ps1"
+
+         (Se voce colocou a pasta em outro lugar, troque o caminho.)
+
+         Para colar no PowerShell: clique com o botao DIREITO dentro
+         da janela azul - ele cola sozinho.
+
+
+PASSO 4. O instalador vai conversar com voce. Ele pergunta:
+
+           "Endereco do banco [localhost]"  -> so aperte ENTER
+           "Porta [5432]"                   -> so aperte ENTER
+           "Usuario [postgres]"             -> so aperte ENTER
+           "Senha do usuario 'postgres'"    -> digite a senha
+
+         A senha NAO aparece na tela enquanto voce digita. Isso e
+         normal - digite e aperte ENTER.
+
+         A partir dai ele faz tudo sozinho:
+           - copia o sistema para C:\FarmaciaEliseu
+           - cria o servico do Windows (liga sozinho com a maquina e
+             reinicia sozinho se travar)
+           - libera a porta 5080 no Firewall
+           - agenda o backup do banco todo dia as 23:30
+
+
+PASSO 5. No fim ele mostra, em verde:
+
+             DEU CERTO! O sistema esta no ar...
+
+             Neste servidor:          http://localhost:5080
+             Nos outros computadores: http://192.168.x.x:5080
+
+         >>> ANOTE O SEGUNDO ENDERECO. <<<
+         E ele que todo mundo vai usar. O numero varia conforme a
+         rede da farmacia.
+
+         Teste agora: abra o navegador no proprio servidor em
+         http://localhost:5080 - a tela da farmacia tem que aparecer.
+
+
+---------------------------------------------------------------------
+ PARTE 2 - EM CADA COMPUTADOR COM IMPRESSORA TERMICA
+---------------------------------------------------------------------
+
+Faca isso SO nos computadores que tem uma impressora termica ligada
+neles. Inclui o proprio servidor, se ele tambem vender.
+
+PASSO 1. Nesse computador, deixe a impressora termica como
+         IMPRESSORA PADRAO do Windows:
+           Painel de Controle > Dispositivos e Impressoras >
+           botao direito na impressora > "Definir como impressora
+           padrao"
+
+PASSO 2. Leve o pendrive nesse computador e copie a pasta para o
+         disco dele tambem (mesma coisa do Passo 1 da Parte 1).
+
+PASSO 3. Abra o PowerShell COMO ADMINISTRADOR (igual antes) e rode:
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File "C:\FarmaciaEliseu-Instalacao\instalar-impressora.ps1"
+
+PASSO 4. No fim ele mostra o nome da impressora que detectou.
+         CONFIRA se e mesmo a impressora termica. Se nao for, troque
+         a impressora padrao do Windows e rode na janela azul:
+
+             Restart-Service FarmaciaEliseuPrintAgent
+
+
+---------------------------------------------------------------------
+ PARTE 3 - DEIXANDO PRONTO PARA OS VENDEDORES
+---------------------------------------------------------------------
+
+Em cada computador da farmacia, abra o navegador (Chrome ou Edge) no
+endereco que voce anotou:
+
+    http://192.168.x.x:5080
+
+Deixe salvo como favorito, ou crie um atalho na area de trabalho:
+  - Botao direito na area de trabalho > Novo > Atalho
+  - Cole o endereco
+  - De o nome de "Farmacia do Eliseu"
+
+Pronto. Ninguem precisa abrir terminal nem ligar nada: o sistema
+sobe junto com o servidor, todo dia.
+
+
+---------------------------------------------------------------------
+ SE DER PROBLEMA
+---------------------------------------------------------------------
+
+"Deu erro dizendo que nao encontrou o arquivo"
+    O caminho que voce colou nao existe. Confira assim:
+      1. Abra a pasta C:\FarmaciaEliseu-Instalacao no Explorador
+      2. Veja se o instalar-servidor.ps1 esta SOLTO ali dentro
+      3. Se ele estiver dentro de mais uma pasta, use o caminho
+         completo ate ele. Exemplo:
+           powershell -NoProfile -ExecutionPolicy Bypass -File "C:\FarmaciaEliseu-Instalacao\FarmaciaEliseu-Instalacao\instalar-servidor.ps1"
+    Dica: no Explorador, clique na barra de endereco, copie o caminho
+    e monte o comando com ele.
+
+"Nao consigo abrir de outro computador, mas no servidor funciona"
+    - Confirme que voce digitou o IP do SERVIDOR, com :5080 no fim.
+    - Confirme que os dois estao na mesma rede.
+    - Descubra o IP certo rodando no servidor:  ipconfig
+      (procure "Endereco IPv4")
+
+"O instalador terminou em vermelho dizendo que nao respondeu"
+    Quase sempre e a senha do banco errada. Corrija assim:
+      1. Abra o Bloco de Notas COMO ADMINISTRADOR
+      2. Abra o arquivo:
+         C:\FarmaciaEliseu\backend\appsettings.Production.json
+      3. Ajuste a senha depois de "Password="
+      4. Salve e rode na janela azul:
+             Restart-Service FarmaciaEliseuBackend
+
+"O cupom nao imprime"
+    - No computador que esta vendendo, abra http://localhost:9123/status
+      Se nao responder, o agente de impressao nao esta instalado
+      NAQUELE computador - refaca a Parte 2 nele.
+    - Se responder mas com o nome de outra impressora, troque a
+      impressora padrao do Windows e rode:
+          Restart-Service FarmaciaEliseuPrintAgent
+
+"Como sei se esta tudo rodando?"
+    No servidor:
+        Get-Service FarmaciaEliseuBackend
+        Get-ScheduledTask FarmaciaEliseuBackupBanco
+    Em cada PC com impressora:
+        Get-Service FarmaciaEliseuPrintAgent
+    Tem que aparecer "Running". Se aparecer "Stopped":
+        Start-Service FarmaciaEliseuBackend
+
+"Onde vejo o erro exato?"
+    Menu Iniciar > "Visualizador de Eventos" >
+    Logs do Windows > Aplicativo
+
+"Quero testar o backup agora, sem esperar a noite"
+    Start-ScheduledTask -TaskName FarmaciaEliseuBackupBanco
+    Depois confira se apareceu arquivo novo em:
+    C:\FarmaciaEliseu\backups
+
+
+---------------------------------------------------------------------
+ PARA ATUALIZAR O SISTEMA NO FUTURO
+---------------------------------------------------------------------
+
+Quando eu te entregar uma pasta nova:
+  1. Copie a pasta nova para o servidor.
+  2. Rode o instalar-servidor.ps1 de novo, do mesmo jeito.
+
+Ele reconhece que ja existe instalacao, para o servico, substitui os
+arquivos e religa - e REAPROVEITA a senha do banco, entao nao vai
+perguntar de novo. O banco de dados nao e tocado em momento nenhum.
+
+
+---------------------------------------------------------------------
+ PARA DESINSTALAR
+---------------------------------------------------------------------
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File "C:\FarmaciaEliseu-Instalacao\desinstalar.ps1"
+
+Remove os servicos, a tarefa de backup e a regra de firewall.
+NAO apaga o banco de dados e NAO apaga os backups.
+
+
+---------------------------------------------------------------------
+ O QUE ESTE INSTALADOR MEXE NA MAQUINA
+---------------------------------------------------------------------
+
+Para voce saber exatamente o que esta acontecendo:
+
+  CRIA   a pasta C:\FarmaciaEliseu (programa + backups)
+  CRIA   o servico do Windows "FarmaciaEliseuBackend"
+  CRIA   o servico "FarmaciaEliseuPrintAgent" (so na Parte 2)
+  CRIA   a regra de firewall "Farmacia Eliseu (5080)"
+  CRIA   a tarefa agendada "FarmaciaEliseuBackupBanco"
+  GRAVA  a senha do banco em dois lugares desta maquina:
+           C:\FarmaciaEliseu\backend\appsettings.Production.json
+           ...\AppData\Roaming\postgresql\pgpass.conf
+         (necessario para o backup rodar sozinho de madrugada)
+
+  NAO altera a estrutura do banco de dados.
+  NAO apaga nenhum dado.
+  NAO instala nada alem disso no Windows.
+
+=====================================================================

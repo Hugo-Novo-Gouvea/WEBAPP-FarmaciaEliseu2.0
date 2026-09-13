@@ -31,16 +31,22 @@ public class ItensReceberController : ControllerBase
     public async Task<ActionResult<PagedResult<ItemPendenteDto>>> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
-        [FromQuery] string? search = null)
+        [FromQuery] string? search = null,
+        [FromQuery] int? clientesId = null)
     {
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 200);
 
         var query =
-            from item in _context.ItensPorMovimento
-            join mov in _context.Movimentos on item.MovimentosId equals mov.MovimentosId
-            where item.DataPagamentoItem == null && mov.DataPagamento == null
-            select new { item, mov };
+            (from item in _context.ItensPorMovimento
+             join mov in _context.Movimentos on item.MovimentosId equals mov.MovimentosId
+             where item.DataPagamentoItem == null && mov.DataPagamento == null
+             select new { item, mov }).AsNoTracking();
+
+        if (clientesId is not null)
+        {
+            query = query.Where(x => x.mov.ClientesId == clientesId);
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -52,7 +58,7 @@ public class ItensReceberController : ControllerBase
 
         var totalCount = await query.CountAsync();
         var pagina = await query
-            .OrderBy(x => x.mov.DataVenda)
+            .OrderByDescending(x => x.mov.DataVenda)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
@@ -101,10 +107,13 @@ public class ItensReceberController : ControllerBase
         }
 
         var itens = await _context.ItensPorMovimento
+            .AsNoTracking()
             .Where(i => idsUnicos.Contains(i.IpmId))
             .ToListAsync();
 
         var movimentosIds = itens.Select(i => i.MovimentosId!.Value).Distinct().ToList();
+        // Estes SIM ficam rastreados: são alterados mais abaixo (fecham o
+        // movimento quando todos os itens dele foram quitados) e salvos.
         var movimentos = await _context.Movimentos
             .Where(m => movimentosIds.Contains(m.MovimentosId))
             .ToListAsync();
@@ -134,7 +143,7 @@ public class ItensReceberController : ControllerBase
                 return BadRequest("Informe o funcionário responsável para lançar o resto de conta.");
             }
 
-            funcionario = await _context.Funcionarios.FirstOrDefaultAsync(f => f.FuncionariosId == dto.FuncionariosId);
+            funcionario = await _context.Funcionarios.AsNoTracking().FirstOrDefaultAsync(f => f.FuncionariosId == dto.FuncionariosId);
             if (funcionario is null)
             {
                 await transaction.RollbackAsync();
@@ -148,7 +157,7 @@ public class ItensReceberController : ControllerBase
         {
             var clienteId = clientesIds[0];
             var cliente = clienteId != null
-                ? await _context.Clientes.FirstOrDefaultAsync(c => c.ClientesId == clienteId)
+                ? await _context.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.ClientesId == clienteId)
                 : null;
 
             var novoMovimento = new Movimento
@@ -195,6 +204,7 @@ public class ItensReceberController : ControllerBase
         foreach (var movimentoId in movimentosIds)
         {
             var itensDoMovimento = await _context.ItensPorMovimento
+                .AsNoTracking()
                 .Where(i => i.MovimentosId == movimentoId)
                 .ToListAsync();
 

@@ -37,6 +37,8 @@ interface MovimentoDetalheDialogProps {
   onClose: () => void
   onCancelado?: () => void
   actions?: ReactNode
+  /** Só consulta: esconde Cancelar Venda e Imprimir. */
+  somenteLeitura?: boolean
 }
 
 export function MovimentoDetalheDialog({
@@ -46,6 +48,7 @@ export function MovimentoDetalheDialog({
   onClose,
   onCancelado,
   actions,
+  somenteLeitura,
 }: MovimentoDetalheDialogProps) {
   const [cancelando, setCancelando] = useState(false)
   const [erroCancelar, setErroCancelar] = useState<string | null>(null)
@@ -132,7 +135,7 @@ export function MovimentoDetalheDialog({
               Itens do movimento
             </Typography>
             <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
+              <Table size="small" sx={{ minWidth: 640 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell>Produto</TableCell>
@@ -165,23 +168,31 @@ export function MovimentoDetalheDialog({
           </>
         )}
       </DialogContent>
-      <DialogActions>
-        {selectedId !== null && (
-          <Button
-            color="error"
-            startIcon={<CancelIcon />}
-            onClick={cancelarVenda}
-            disabled={cancelando || loading}
-          >
-            Cancelar Venda
+      <DialogActions sx={{ flexWrap: 'wrap' }}>
+        {somenteLeitura ? (
+          <Button variant="contained" onClick={onClose}>
+            Fechar
           </Button>
+        ) : (
+          <>
+            {selectedId !== null && (
+              <Button
+                color="error"
+                startIcon={<CancelIcon />}
+                onClick={cancelarVenda}
+                disabled={cancelando || loading}
+              >
+                Cancelar Venda
+              </Button>
+            )}
+            {selectedId !== null && (
+              <Button startIcon={<PrintIcon />} onClick={() => perguntarEImprimir(selectedId)}>
+                Imprimir
+              </Button>
+            )}
+            {actions}
+          </>
         )}
-        {selectedId !== null && (
-          <Button startIcon={<PrintIcon />} onClick={() => perguntarEImprimir(selectedId)}>
-            Imprimir
-          </Button>
-        )}
-        {actions}
       </DialogActions>
     </Dialog>
   )

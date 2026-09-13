@@ -25,3 +25,8 @@ backend/**/appsettings.Production.json
 # IDE
 .vs/
 .vscode/
+
+# Pacote de instalacao gerado (self-contained, ~220 MB)
+pacote-instalacao/
+FarmaciaEliseu-Instalacao*.zip
+PARA-O-PENDRIVE/

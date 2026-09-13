@@ -25,6 +25,7 @@ public class ClientesController : ControllerBase
     public async Task<ActionResult<IEnumerable<ClienteDto>>> GetAll()
     {
         var clientes = await _context.Clientes
+            .AsNoTracking()
             .OrderBy(c => c.Nome)
             .ToListAsync();
         return Ok(clientes.Select(ToDto));
@@ -33,7 +34,7 @@ public class ClientesController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ClienteDto>> GetById(int id)
     {
-        var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.ClientesId == id);
+        var cliente = await _context.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.ClientesId == id);
         if (cliente is null) return NotFound();
         return Ok(ToDto(cliente));
     }

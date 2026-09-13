@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   Box,
-  Button,
   Chip,
   IconButton,
   Paper,
@@ -16,13 +15,11 @@ import {
   Typography,
 } from '@mui/material'
 import VisibilityIcon from '@mui/icons-material/Visibility'
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { movimentosApi } from '../api/movimentos'
 import type { Movimento } from '../types/Movimento'
 import { diasEmAberto, formatDateTime, formatMoney } from '../utils/format'
 import { useMovimentoDetalhe } from '../hooks/useMovimentoDetalhe'
 import { MovimentoDetalheDialog } from '../components/MovimentoDetalheDialog'
-import { perguntarEImprimir } from '../printing/perguntarEImprimir'
 import { getErrorMessage } from '../utils/errors'
 
 // A busca/dias digitados só disparam a chamada à API depois desse intervalo
@@ -41,7 +38,6 @@ export function CobrancaPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(25)
-  const [marcandoPagoId, setMarcandoPagoId] = useState<number | null>(null)
 
   const { selectedId, detalhe, loading: detalheLoading, openDetalhe, closeDetalhe } =
     useMovimentoDetalhe(setError)
@@ -79,24 +75,6 @@ export function CobrancaPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(carregar, [dias, page, rowsPerPage, search])
 
-  const marcarComoPago = async (id: number) => {
-    const confirmado = window.confirm('Confirma que este movimento foi pago?')
-    if (!confirmado) return
-
-    setMarcandoPagoId(id)
-    try {
-      await movimentosApi.marcarComoPago(id)
-      closeDetalhe()
-      carregar()
-      await perguntarEImprimir(id)
-    } catch (err) {
-      setError(getErrorMessage(err, 'Não foi possível marcar o movimento como pago.'))
-      carregar()
-    } finally {
-      setMarcandoPagoId(null)
-    }
-  }
-
   const totalEmAberto = items.reduce((soma, m) => soma + (m.valorTotal ?? 0), 0)
 
   return (
@@ -110,14 +88,14 @@ export function CobrancaPage() {
             type="number"
             value={diasInput}
             onChange={(e) => setDiasInput(e.target.value)}
-            sx={{ width: 220 }}
+            sx={{ width: { xs: '100%', sm: 220 } }}
           />
           <TextField
             size="small"
             placeholder="Buscar por cliente, funcionário ou código..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            sx={{ flexGrow: 1, maxWidth: 360 }}
+            sx={{ flexGrow: 1, minWidth: 160, maxWidth: 360 }}
           />
         </Box>
       </Box>
@@ -133,7 +111,7 @@ export function CobrancaPage() {
       )}
 
       <TableContainer component={Paper}>
-        <Table size="small">
+        <Table size="small" sx={{ minWidth: 900 }}>
           <TableHead>
             <TableRow>
               <TableCell>Código</TableCell>
@@ -147,7 +125,12 @@ export function CobrancaPage() {
           </TableHead>
           <TableBody>
             {items.map((m) => (
-              <TableRow key={m.movimentosId} hover>
+              <TableRow
+                key={m.movimentosId}
+                hover
+                onClick={() => openDetalhe(m.movimentosId)}
+                sx={{ cursor: 'pointer' }}
+              >
                 <TableCell>{m.codigoMovimento ?? m.movimentosId}</TableCell>
                 <TableCell>{m.clientesNome}</TableCell>
                 <TableCell>{m.funcionariosNome}</TableCell>
@@ -157,17 +140,15 @@ export function CobrancaPage() {
                 </TableCell>
                 <TableCell align="right">{formatMoney(m.valorTotal)}</TableCell>
                 <TableCell align="right">
-                  <IconButton size="small" onClick={() => openDetalhe(m.movimentosId)} aria-label="ver itens">
-                    <VisibilityIcon fontSize="small" />
-                  </IconButton>
                   <IconButton
                     size="small"
-                    onClick={() => marcarComoPago(m.movimentosId)}
-                    disabled={marcandoPagoId === m.movimentosId}
-                    aria-label="marcar como pago"
-                    title="Marcar como pago"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openDetalhe(m.movimentosId)
+                    }}
+                    aria-label="ver itens"
                   >
-                    <CheckCircleIcon fontSize="small" />
+                    <VisibilityIcon fontSize="small" />
                   </IconButton>
                 </TableCell>
               </TableRow>
@@ -201,19 +182,7 @@ export function CobrancaPage() {
         detalhe={detalhe}
         loading={detalheLoading}
         onClose={closeDetalhe}
-        onCancelado={carregar}
-        actions={
-          selectedId !== null && (
-            <Button
-              variant="contained"
-              startIcon={<CheckCircleIcon />}
-              onClick={() => marcarComoPago(selectedId)}
-              disabled={marcandoPagoId === selectedId}
-            >
-              Marcar como pago
-            </Button>
-          )
-        }
+        somenteLeitura
       />
     </Box>
   )

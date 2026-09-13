@@ -15,13 +15,15 @@ public class CupomService
     // Largura típica de bobina 40 colunas
     private const int Cols = 40;
 
-    public string GerarBase64Venda(MovimentoDetalheDto venda, int? codigoFichario = null)
+    // informarValor = false imprime o cupom sem nenhum valor: só quantidade e
+    // descrição dos itens, sem a coluna de total e sem o bloco de totais.
+    public string GerarBase64Venda(MovimentoDetalheDto venda, int? codigoFichario = null, bool informarValor = true)
     {
-        var bytes = BuildReceipt(venda, codigoFichario);
+        var bytes = BuildReceipt(venda, codigoFichario, informarValor);
         return Convert.ToBase64String(bytes);
     }
 
-    private byte[] BuildReceipt(MovimentoDetalheDto venda, int? codigoFichario)
+    private byte[] BuildReceipt(MovimentoDetalheDto venda, int? codigoFichario, bool informarValor)
     {
         // Define se é venda FIADO (Marcar)
         // Se não tem data de pagamento, é Fiado.
@@ -109,11 +111,9 @@ public class CupomService
 
         // 3. ITENS
         // Cabeçalho: QTD  DESCRICAO (Resumida) VALOR
-        string header = string.Concat(
-            FitLeft("QTD", 4), " ",
-            FitLeft("ITEM", 26), " ",
-            FitLeft("TOTAL", 8)
-        );
+        string header = informarValor
+            ? string.Concat(FitLeft("QTD", 4), " ", FitLeft("ITEM", 26), " ", FitLeft("TOTAL", 8))
+            : string.Concat(FitLeft("QTD", 4), " ", FitLeft("ITEM", 26));
         parts.Add(Encoding.ASCII.GetBytes(Line(header)));
 
         if (venda.Itens != null && venda.Itens.Any())
@@ -123,22 +123,22 @@ public class CupomService
                 string desc = ToAscii(item.ProdutosDescricao ?? "");
                 if (desc.Length > 26) desc = desc[..26];
 
-                // --- LÓGICA DE VALOR DOS ITENS ---
-                string valorExibido;
-                if (isFiado)
+                string inicioLinha = string.Concat(
+                    FitRight((item.Quantidade ?? 0).ToString(), 3), "  ",
+                    FitLeft(desc, 26)
+                );
+
+                string linha;
+                if (!informarValor)
                 {
-                    valorExibido = "  APRAZO"; // Texto fixo se for fiado
+                    linha = inicioLinha;
                 }
                 else
                 {
-                    valorExibido = Money(item.PrecoTotalDiaVenda ?? 0); // Valor normal
+                    // Fiado esconde o valor do item e mostra APRAZO no lugar.
+                    string valorExibido = isFiado ? "  APRAZO" : Money(item.PrecoTotalDiaVenda ?? 0);
+                    linha = string.Concat(inicioLinha, " ", FitRight(valorExibido, 8));
                 }
-
-                string linha = string.Concat(
-                    FitRight((item.Quantidade ?? 0).ToString(), 3), "  ",
-                    FitLeft(desc, 26), " ",
-                    FitRight(valorExibido, 8)
-                );
                 parts.Add(Encoding.ASCII.GetBytes(Line(linha)));
             }
         }
@@ -149,31 +149,25 @@ public class CupomService
 
         parts.Add(Encoding.ASCII.GetBytes(Line(new string('-', Cols))));
 
-        // 4. TOTAIS
-        var valorTotal = venda.ValorTotal ?? 0;
-        var descontoTotal = venda.DescontoTotal ?? 0;
-
-        // Se for Fiado, escondemos também o subtotal e o total numérico
-        if (!isFiado && descontoTotal > 0)
+        // 4. TOTAIS — o bloco inteiro some quando é para não informar valor.
+        if (informarValor)
         {
-            parts.Add(Encoding.ASCII.GetBytes(Line(RightLine("SUBTOTAL: " + Money(valorTotal + descontoTotal)))));
-            parts.Add(Encoding.ASCII.GetBytes(Line(RightLine("DESCONTO: -" + Money(descontoTotal)))));
-        }
+            var valorTotal = venda.ValorTotal ?? 0;
+            var descontoTotal = venda.DescontoTotal ?? 0;
 
-        // --- LÓGICA DO TOTAL FINAL ---
-        string totalFinalTexto;
-        if (isFiado)
-        {
-            totalFinalTexto = "APRAZO";
-        }
-        else
-        {
-            totalFinalTexto = Money(valorTotal);
-        }
+            // Se for Fiado, escondemos também o subtotal e o total numérico
+            if (!isFiado && descontoTotal > 0)
+            {
+                parts.Add(Encoding.ASCII.GetBytes(Line(RightLine("SUBTOTAL: " + Money(valorTotal + descontoTotal)))));
+                parts.Add(Encoding.ASCII.GetBytes(Line(RightLine("DESCONTO: -" + Money(descontoTotal)))));
+            }
 
-        parts.Add(boldOn);
-        parts.Add(Encoding.ASCII.GetBytes(Line(RightLine("TOTAL A PAGAR: " + totalFinalTexto))));
-        parts.Add(boldOff);
+            string totalFinalTexto = isFiado ? "APRAZO" : Money(valorTotal);
+
+            parts.Add(boldOn);
+            parts.Add(Encoding.ASCII.GetBytes(Line(RightLine("TOTAL A PAGAR: " + totalFinalTexto))));
+            parts.Add(boldOff);
+        }
 
         // FORMA DE PAGAMENTO
         string formaPag = isFiado ? "MARCAR / FIADO" : "DINHEIRO / PAGO";

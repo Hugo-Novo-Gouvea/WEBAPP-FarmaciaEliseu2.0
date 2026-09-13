@@ -37,7 +37,7 @@ export function Home() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 2, flexWrap: 'wrap' }}>
         <Typography variant="h5">Início</Typography>
         <Button
           variant="contained"
@@ -74,7 +74,7 @@ export function Home() {
         Últimas vendas
       </Typography>
       <TableContainer component={Paper}>
-        <Table size="small">
+        <Table size="small" sx={{ minWidth: 680 }}>
           <TableHead>
             <TableRow>
               <TableCell>Cliente</TableCell>

@@ -2,24 +2,22 @@ import { CrudPage, type ColumnConfig, type FieldConfig } from '../components/Cru
 import { funcionariosApi } from '../api/funcionarios'
 import type { Funcionario, FuncionarioInput } from '../types/Funcionario'
 
-const columns: ColumnConfig<Funcionario>[] = [
-  { key: 'nome', label: 'Nome' },
-  { key: 'codigoAntigo', label: 'Código Antigo' },
-]
+const columns: ColumnConfig<Funcionario>[] = [{ key: 'nome', label: 'Nome' }]
 
 const fields: FieldConfig<FuncionarioInput>[] = [
   { key: 'nome', label: 'Nome', type: 'text', required: true },
-  { key: 'codigoAntigo', label: 'Código Antigo', type: 'text' },
 ]
 
+// codigoAntigo saiu da tela (dado do sistema antigo). Cadastro novo grava 0;
+// na edição o valor que já existe no banco é preservado.
 const emptyInput: FuncionarioInput = {
   nome: '',
-  codigoAntigo: '',
+  codigoAntigo: '0',
 }
 
 const toInput = (item: Funcionario): FuncionarioInput => ({
   nome: item.nome ?? '',
-  codigoAntigo: item.codigoAntigo ?? '',
+  codigoAntigo: item.codigoAntigo ?? '0',
 })
 
 export function FuncionariosPage() {

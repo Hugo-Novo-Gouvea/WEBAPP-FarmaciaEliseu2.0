@@ -26,6 +26,7 @@ public class ProdutosController : ControllerBase
     public async Task<ActionResult<IEnumerable<ProdutoDto>>> GetAll()
     {
         var produtos = await _context.Produtos
+            .AsNoTracking()
             .OrderBy(p => p.Descricao)
             .ToListAsync();
         return Ok(produtos.Select(ToDto));
@@ -34,7 +35,7 @@ public class ProdutosController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ProdutoDto>> GetById(int id)
     {
-        var produto = await _context.Produtos.FirstOrDefaultAsync(p => p.ProdutosId == id);
+        var produto = await _context.Produtos.AsNoTracking().FirstOrDefaultAsync(p => p.ProdutosId == id);
         if (produto is null) return NotFound();
         return Ok(ToDto(produto));
     }
@@ -47,7 +48,8 @@ public class ProdutosController : ControllerBase
     {
         if (!string.IsNullOrWhiteSpace(codigoBarras))
         {
-            var produto = await _context.Produtos.FirstOrDefaultAsync(p => p.CodigoBarras == codigoBarras);
+            var produto = await _context.Produtos.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.CodigoBarras == codigoBarras);
             if (produto is null) return NotFound();
             return Ok(ToDto(produto));
         }
@@ -56,6 +58,7 @@ public class ProdutosController : ControllerBase
         {
             var termo = nome.Trim();
             var produtos = await _context.Produtos
+                .AsNoTracking()
                 .Where(p => p.Descricao != null && EF.Functions.ILike(p.Descricao, $"%{termo}%"))
                 .OrderBy(p => p.Descricao)
                 .Take(20)

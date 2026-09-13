@@ -34,6 +34,7 @@ public class DashboardController : ControllerBase
         var fiadoAbertoTotal = await fiadoAberto.SumAsync(m => (decimal?)m.ValorTotal) ?? 0;
 
         var ultimasVendas = await _context.Movimentos
+            .AsNoTracking()
             .OrderByDescending(m => m.DataVenda)
             .Take(5)
             .ToListAsync();

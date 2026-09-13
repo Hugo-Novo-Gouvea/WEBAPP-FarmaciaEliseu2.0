@@ -33,7 +33,8 @@ public class MovimentosController : ControllerBase
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 200);
 
-        var query = baseQuery;
+        // Só leitura: sem rastreamento de mudanças do EF (economiza CPU/RAM).
+        var query = baseQuery.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -100,10 +101,11 @@ public class MovimentosController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<MovimentoDetalheDto>> GetById(int id)
     {
-        var movimento = await _context.Movimentos.FirstOrDefaultAsync(m => m.MovimentosId == id);
+        var movimento = await _context.Movimentos.AsNoTracking().FirstOrDefaultAsync(m => m.MovimentosId == id);
         if (movimento is null) return NotFound();
 
         var itens = await _context.ItensPorMovimento
+            .AsNoTracking()
             .Where(i => i.MovimentosId == id)
             .OrderBy(i => i.ProdutosDescricao)
             .ToListAsync();
@@ -114,12 +116,13 @@ public class MovimentosController : ControllerBase
     // Gera o cupom em ESC/POS (Base64) deste movimento, para os pontos de
     // impressao no front (Movimentacao, Vender e Contas a Receber).
     [HttpGet("{id:int}/cupom")]
-    public async Task<ActionResult<CupomDto>> GetCupom(int id)
+    public async Task<ActionResult<CupomDto>> GetCupom(int id, [FromQuery] bool informarValor = true)
     {
-        var movimento = await _context.Movimentos.FirstOrDefaultAsync(m => m.MovimentosId == id);
+        var movimento = await _context.Movimentos.AsNoTracking().FirstOrDefaultAsync(m => m.MovimentosId == id);
         if (movimento is null) return NotFound();
 
         var itens = await _context.ItensPorMovimento
+            .AsNoTracking()
             .Where(i => i.MovimentosId == id)
             .OrderBy(i => i.ProdutosDescricao)
             .ToListAsync();
@@ -134,7 +137,7 @@ public class MovimentosController : ControllerBase
         }
 
         var detalhe = MovimentoMapper.ToDetalheDto(movimento, itens);
-        var base64 = _cupomService.GerarBase64Venda(detalhe, codigoFichario);
+        var base64 = _cupomService.GerarBase64Venda(detalhe, codigoFichario, informarValor);
 
         return Ok(new CupomDto(base64));
     }
@@ -165,7 +168,7 @@ public class MovimentosController : ControllerBase
             return Conflict("Este movimento já está marcado como pago (talvez por outra pessoa agora mesmo).");
         }
 
-        var movimento = await _context.Movimentos.FirstAsync(m => m.MovimentosId == id);
+        var movimento = await _context.Movimentos.AsNoTracking().FirstAsync(m => m.MovimentosId == id);
         return Ok(MovimentoMapper.ToDto(movimento));
     }
 

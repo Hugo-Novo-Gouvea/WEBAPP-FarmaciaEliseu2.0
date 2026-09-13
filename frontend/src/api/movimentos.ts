@@ -13,7 +13,9 @@ export const movimentosApi = {
     apiClient.get<MovimentoDetalhe>(`/movimentos/${id}`).then((r) => r.data),
   marcarComoPago: (id: number) =>
     apiClient.post<Movimento>(`/movimentos/${id}/marcar-pago`).then((r) => r.data),
-  getCupom: (id: number) =>
-    apiClient.get<{ base64: string }>(`/movimentos/${id}/cupom`).then((r) => r.data.base64),
+  getCupom: (id: number, informarValor = true) =>
+    apiClient
+      .get<{ base64: string }>(`/movimentos/${id}/cupom`, { params: { informarValor } })
+      .then((r) => r.data.base64),
   cancelar: (id: number) => apiClient.post(`/movimentos/${id}/cancelar`),
 }
